@@ -1,0 +1,25 @@
+[package]
+name = "pass-it-on-release-monitor"
+version = "0.0.1"
+authors = ["Kevin Wheelans <kevin.wheelans@proton.me>"]
+edition = "2021"
+rust-version = "1.70"
+description = "Monitor for configured released and send update"
+license = "MIT"
+readme = "README.md"
+
+
+[dependencies]
+clap = {version = "4", features = ["derive"]}
+log = "0.4"
+reqwest = { version = "0.12" }
+serde_json = "1"
+serde = { version = "1", features = ["derive"] }
+simple_logger = "5"
+thiserror = "1"
+tokio = { version = "1", features = ["sync", "macros", "rt-multi-thread"] }
+toml = "0.8"
+
+[profile.release]
+lto = true
+codegen-units = 1
