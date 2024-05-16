@@ -1,14 +1,22 @@
-use async_trait::async_trait;
 use crate::error::Error;
-use log::{debug};
+use crate::monitors::{FrequencyPeriod, FrequencyValue, Monitor};
+use async_trait::async_trait;
+use log::trace;
+use pass_it_on::notifications::{ClientReadyMessage, Message};
 use serde::Deserialize;
-use crate::monitors::Monitor;
+use std::time::Duration;
+
+const TYPE_NAME: &str = "rancher-channel";
 
 #[derive(Deserialize, Debug)]
 pub struct RancherChannelServerConfiguration {
     pub url: String,
     pub channel: String,
     pub notification: String,
+    #[serde(default)]
+    pub frequency: FrequencyValue,
+    #[serde(default)]
+    pub period: FrequencyPeriod,
 }
 
 #[derive(Deserialize, Debug)]
@@ -47,13 +55,33 @@ impl Monitor for RancherChannelServerConfiguration {
         self.check_channel().await
     }
 
-    async fn notify(&self) -> Result<(), Error> {
-        todo!("notify not implemented");
-        //Ok(())
+    fn message(&self, version: &str) -> ClientReadyMessage {
+        Message::new(format!(
+            "Version {} now available for channel {} at {}",
+            version,
+            self.channel.as_str(),
+            self.url.as_str()
+        ))
+        .to_client_ready_message(self.notification.as_str())
     }
-    
-}
 
+    fn monitor_type(&self) -> String {
+        TYPE_NAME.to_string()
+    }
+
+    fn monitor_id(&self) -> String {
+        format!(
+            "{}-{}-{}",
+            self.monitor_type(),
+            self.channel.as_str(),
+            self.url.as_str()
+        )
+    }
+
+    fn frequency(&self) -> Duration {
+        self.period.to_duration(self.frequency.0)
+    }
+}
 
 impl RancherChannelServerConfiguration {
     async fn get_channels(&self) -> Result<Collection, Error> {
@@ -62,10 +90,10 @@ impl RancherChannelServerConfiguration {
     }
 
     async fn check_channel(&self) -> Result<String, Error> {
-        debug!("Checking Rancher Channels for {}", self.url.as_str());
+        trace!("Checking Rancher Channels for {}", self.monitor_id());
         let channels = self.get_channels().await?;
 
-        debug!("Received Rancher Channels for {}", self.url.as_str());
+        trace!("Received Rancher Channels for {}", self.monitor_id());
         let search = self.channel.as_str();
 
         match channels
@@ -74,11 +102,10 @@ impl RancherChannelServerConfiguration {
             .find(|c| c.id.eq_ignore_ascii_case(search))
         {
             Some(channel) => {
-                debug!("Name: {} Version: {}", channel.name, channel.latest);
+                trace!("Name: {} Version: {}", channel.name, channel.latest);
                 Ok(channel.latest)
             }
-            None => Err(Error::NoChannelFound(search.to_string())),
+            None => Err(Error::RancherChannelNotFound(search.to_string())),
         }
     }
-    
 }

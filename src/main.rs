@@ -4,12 +4,14 @@ mod error;
 mod monitors;
 
 use crate::cli::CliArgs;
-use crate::error::Error;
-use clap::Parser;
-use log::{debug, error, LevelFilter};
-use std::process::ExitCode;
 use crate::configuration::MonitorConfigFileParser;
-
+use crate::error::Error;
+use crate::monitors::monitor;
+use clap::Parser;
+use log::{error, LevelFilter};
+use pass_it_on::start_client;
+use std::process::ExitCode;
+use tokio::sync::mpsc;
 const LOG_TARGET: &str = "pass_it_on_release_monitor";
 
 #[tokio::main]
@@ -43,14 +45,12 @@ async fn run(args: CliArgs) -> Result<(), Error> {
             config_path.to_string_lossy()
         )));
     }
-    
+
     let config = MonitorConfigFileParser::try_from(std::fs::read_to_string(config_path)?.as_str())?;
+    let (interface_tx, interface_rx) = mpsc::channel(100);
 
+    tokio::spawn(async move { monitor(config.monitors.monitor, interface_tx.clone()).await });
 
-    for monitor in config.monitors.monitor {
-        let version = monitor.check().await?;
-        debug!("Got version {}", version)
-    }
-
+    start_client(config.client.try_into()?, interface_rx, None, None).await?;
     Ok(())
 }

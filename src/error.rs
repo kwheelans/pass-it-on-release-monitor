@@ -3,12 +3,17 @@ use thiserror::Error;
 /// Errors returned by check-rke2-version
 #[derive(Error, Debug)]
 pub enum Error {
-    #[error("Channel not found: {0}")]
-    NoChannelFound(String),
+    /// Provided rancher channel not found
+    #[error("Rancher channel not found: {0}")]
+    RancherChannelNotFound(String),
 
-    /// Configuration is required to send notifications
+    /// Configuration is required to monitor and send notifications
     #[error("No configuration present: {0}")]
     MissingConfiguration(String),
+
+    /// No monitors found after processing the configuration
+    #[error("No valid configured monitors")]
+    NoMonitors,
 
     // ### Converting from other error types ###
     /// Pass-thru [`std::io::Error`].
