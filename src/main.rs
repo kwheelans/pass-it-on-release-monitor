@@ -1,20 +1,22 @@
-mod error;
-mod models;
 mod cli;
 mod configuration;
+mod error;
+mod monitors;
 
-use std::process::ExitCode;
-use clap::Parser;
-use log::{debug, error, info, LevelFilter};
 use crate::cli::CliArgs;
 use crate::error::Error;
-use crate::models::rancher_channel_server::get_channels;
-
+use clap::Parser;
+use log::{debug, error, LevelFilter};
+use std::process::ExitCode;
+use crate::configuration::MonitorConfigFileParser;
+use crate::monitors::rancher_channel_server::check_channel;
 
 const LOG_TARGET: &str = "pass_it_on_release_monitor";
 #[tokio::main]
 async fn main() -> ExitCode {
     let args = CliArgs::parse();
+
+    // Configure logging
     simple_logger::SimpleLogger::new()
         .with_level(LevelFilter::Off)
         .env()
@@ -22,6 +24,7 @@ async fn main() -> ExitCode {
         .with_colors(true)
         .init()
         .unwrap();
+
     match run(args).await {
         Err(error) => {
             error!(target: LOG_TARGET, "{}", error);
@@ -32,19 +35,22 @@ async fn main() -> ExitCode {
 }
 
 async fn run(args: CliArgs) -> Result<(), Error> {
-    info!("Begin monitoring");
-    let search = "stable"; //TODO: get from config
-    let channels = get_channels(search).await?;
-    debug!("Received RKE2 Channels");
-    let search = "stable";
-    
-    match channels.data.into_iter().find(|c| c.id.eq_ignore_ascii_case(search)) {
-        Some(channel) => {
-            debug!("Name: {} Version: {}", channel.name, channel.latest);
-            Ok(())
-        }
-        None => {
-            Err(Error::NoChannelFound(search.to_string()))
-        }
+    let config_path = args.config;
+
+    if !config_path.is_file() {
+        return Err(Error::MissingConfiguration(format!(
+            "Configuration file {} is not a file or does not exist",
+            config_path.to_string_lossy()
+        )));
     }
+    
+    let config = MonitorConfigFileParser::try_from(std::fs::read_to_string(config_path)?.as_str())?;
+
+
+    for monitor in config.monitor.channel_server {
+        let version = check_channel(&monitor).await?;
+        debug!("Got version {} for channel {}", version, monitor.channel.as_str())
+    }
+
+    Ok(())
 }

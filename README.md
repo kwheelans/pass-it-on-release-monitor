@@ -17,12 +17,12 @@ port = 8080
 [monitor]
 [[rancher-channel-server]]
 url = "https://update.rke2.io/v1-release/channels"
-name = "stable"
+channel = "stable"
 notification = "rke2"
 
 [[rancher-channel-server]]
 url = "https://update.k3s.io/v1-release/channels"
-name = "stable"
+channel = "stable"
 notification = "k3s"
 
 ```
