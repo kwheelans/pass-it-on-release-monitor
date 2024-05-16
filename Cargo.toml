@@ -8,6 +8,8 @@ description = "Monitor for configured released and send update"
 license = "MIT"
 readme = "README.md"
 
+[features]
+vendored-tls = ["reqwest/native-tls-vendored", "pass-it-on/vendored-tls"]
 
 [dependencies]
 async-trait = "0.1"
