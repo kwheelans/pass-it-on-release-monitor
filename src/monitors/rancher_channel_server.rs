@@ -1,6 +1,8 @@
+use async_trait::async_trait;
 use crate::error::Error;
 use log::{debug};
 use serde::Deserialize;
+use crate::monitors::Monitor;
 
 #[derive(Deserialize, Debug)]
 pub struct RancherChannelServerConfiguration {
@@ -38,27 +40,45 @@ pub struct Links {
 #[derive(Deserialize, Debug, Default)]
 pub struct Actions;
 
-async fn get_channels(url: &str) -> Result<Collection, Error> {
-    let data = reqwest::get(url).await?.text().await?;
-    Ok(serde_json::from_str(data.as_str())?)
+#[async_trait]
+#[typetag::deserialize(name = "rancher-channel")]
+impl Monitor for RancherChannelServerConfiguration {
+    async fn check(&self) -> Result<String, Error> {
+        self.check_channel().await
+    }
+
+    async fn notify(&self) -> Result<(), Error> {
+        todo!("notify not implemented");
+        //Ok(())
+    }
+    
 }
 
-pub async fn check_channel(config: &RancherChannelServerConfiguration) -> Result<String, Error> {
-    debug!("Checking Rancher Channels for {}", config.url.as_str());
-    let channels = get_channels(config.url.as_str()).await?;
-    
-    debug!("Received Rancher Channels");
-    let search = config.channel.as_str();
 
-    match channels
-        .data
-        .into_iter()
-        .find(|c| c.id.eq_ignore_ascii_case(search))
-    {
-        Some(channel) => {
-            debug!("Name: {} Version: {}", channel.name, channel.latest);
-            Ok(channel.latest)
-        }
-        None => Err(Error::NoChannelFound(search.to_string())),
+impl RancherChannelServerConfiguration {
+    async fn get_channels(&self) -> Result<Collection, Error> {
+        let data = reqwest::get(self.url.as_str()).await?.text().await?;
+        Ok(serde_json::from_str(data.as_str())?)
     }
+
+    async fn check_channel(&self) -> Result<String, Error> {
+        debug!("Checking Rancher Channels for {}", self.url.as_str());
+        let channels = self.get_channels().await?;
+
+        debug!("Received Rancher Channels for {}", self.url.as_str());
+        let search = self.channel.as_str();
+
+        match channels
+            .data
+            .into_iter()
+            .find(|c| c.id.eq_ignore_ascii_case(search))
+        {
+            Some(channel) => {
+                debug!("Name: {} Version: {}", channel.name, channel.latest);
+                Ok(channel.latest)
+            }
+            None => Err(Error::NoChannelFound(search.to_string())),
+        }
+    }
+    
 }

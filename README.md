@@ -14,13 +14,15 @@ type = "http"
 host = "localhost"
 port = 8080
 
-[monitor]
-[[rancher-channel-server]]
+[monitors]
+[[monitors.monitor]]
+type = "rancher-channel"
 url = "https://update.rke2.io/v1-release/channels"
 channel = "stable"
 notification = "rke2"
 
-[[rancher-channel-server]]
+[[monitors.monitor]]
+type = "rancher-channel"
 url = "https://update.k3s.io/v1-release/channels"
 channel = "stable"
 notification = "k3s"

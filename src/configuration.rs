@@ -1,17 +1,17 @@
 use pass_it_on::ClientConfigFile;
 use serde::Deserialize;
-use crate::monitors::rancher_channel_server::RancherChannelServerConfiguration;
+
+use crate::monitors::Monitor;
 
 #[derive(Deserialize)]
 pub struct MonitorConfigFileParser {
-    pub monitor: MonitorConfiguration,
+    pub monitors: MonitorConfiguration,
     pub client: ClientConfigFile,
 }
 
 #[derive(Deserialize)]
 pub struct MonitorConfiguration {
-    #[serde(rename = "rancher-channel-server")]
-    pub channel_server: Vec<RancherChannelServerConfiguration>,
+    pub monitor: Vec<Box<dyn Monitor>>,
 }
 
 impl TryFrom<&str> for MonitorConfigFileParser {

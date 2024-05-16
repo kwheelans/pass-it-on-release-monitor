@@ -9,9 +9,9 @@ use clap::Parser;
 use log::{debug, error, LevelFilter};
 use std::process::ExitCode;
 use crate::configuration::MonitorConfigFileParser;
-use crate::monitors::rancher_channel_server::check_channel;
 
 const LOG_TARGET: &str = "pass_it_on_release_monitor";
+
 #[tokio::main]
 async fn main() -> ExitCode {
     let args = CliArgs::parse();
@@ -47,9 +47,9 @@ async fn run(args: CliArgs) -> Result<(), Error> {
     let config = MonitorConfigFileParser::try_from(std::fs::read_to_string(config_path)?.as_str())?;
 
 
-    for monitor in config.monitor.channel_server {
-        let version = check_channel(&monitor).await?;
-        debug!("Got version {} for channel {}", version, monitor.channel.as_str())
+    for monitor in config.monitors.monitor {
+        let version = monitor.check().await?;
+        debug!("Got version {}", version)
     }
 
     Ok(())

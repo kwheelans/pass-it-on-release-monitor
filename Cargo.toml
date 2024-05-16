@@ -10,6 +10,7 @@ readme = "README.md"
 
 
 [dependencies]
+async-trait = "0.1"
 clap = {version = "4", features = ["derive"]}
 log = "0.4"
 pass-it-on = { version = "0.14", features = ["client", "http-client", "parse-cfg"], default-features = false}
@@ -20,6 +21,7 @@ simple_logger = "5"
 thiserror = "1"
 tokio = { version = "1", features = ["sync", "macros", "rt-multi-thread"] }
 toml = "0.8"
+typetag = "0.2"
 
 [profile.release]
 lto = true
