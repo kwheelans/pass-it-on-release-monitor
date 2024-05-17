@@ -122,14 +122,25 @@ pub async fn monitor(
         for tracker in monitor_list.as_mut_slice() {
             match tracker.needs_check() {
                 true => {
+                    trace!("{}: Needs check", tracker.monitor.monitor_id());
                     match tracker.monitor.check().await {
                         Ok(latest) => {
-                            tracker.new_version(latest);
-                            if let Err(error) = interface
-                                .send(tracker.monitor.message(tracker.version.as_str()))
-                                .await
-                            {
-                                warn!("Error sending notification: {}", error)
+                            debug!(
+                                "previous version:{} |-| latest version: {}",
+                                tracker.version.as_str(),
+                                latest.as_str()
+                            );
+                            match tracker.new_version(latest) {
+                                true => {
+                                    if let Err(error) = interface
+                                        .send(tracker.monitor.message(tracker.version.as_str()))
+                                        .await
+                                    {
+                                        warn!("Error sending notification: {}", error)
+                                    }
+                                }
+
+                                false => trace!("Previous version is the same as latest version"),
                             }
                         }
                         Err(error) => warn!(
