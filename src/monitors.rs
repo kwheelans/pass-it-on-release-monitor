@@ -79,7 +79,7 @@ impl ReleaseTracker {
     }
 
     pub fn new_version(&mut self, latest: String) -> bool {
-        let update = self.version.eq(&latest);
+        let update = self.version.as_str().ne(latest.as_str());
         if update {
             self.version = latest;
             self.last_check = Instant::now();
@@ -120,43 +120,87 @@ pub async fn monitor(
         tokio::time::sleep(Duration::from_secs(60)).await;
 
         for tracker in monitor_list.as_mut_slice() {
+            let monitor_id = tracker.monitor.monitor_id();
             match tracker.needs_check() {
                 true => {
-                    trace!("{}: Needs check", tracker.monitor.monitor_id());
+                    trace!("{}: check required", monitor_id.as_str());
                     match tracker.monitor.check().await {
                         Ok(latest) => {
                             debug!(
-                                "previous version:{} |-| latest version: {}",
+                                "{}: Checking previous version: {} |-| latest version: {}",
+                                monitor_id.as_str(),
                                 tracker.version.as_str(),
                                 latest.as_str()
                             );
                             match tracker.new_version(latest) {
                                 true => {
+                                    debug!("{}: Sending notification", monitor_id.as_str());
                                     if let Err(error) = interface
                                         .send(tracker.monitor.message(tracker.version.as_str()))
                                         .await
                                     {
-                                        warn!("Error sending notification: {}", error)
+                                        warn!(
+                                            "{}: Error sending notification -> {}",
+                                            monitor_id.as_str(),
+                                            error
+                                        )
                                     }
                                 }
 
-                                false => trace!("Previous version is the same as latest version"),
+                                false => trace!(
+                                    "{}: Both previous and latest version are equal",
+                                    monitor_id.as_str()
+                                ),
                             }
                         }
-                        Err(error) => warn!(
-                            "Unable to check {}: {}",
-                            tracker.monitor.monitor_id(),
-                            error
-                        ),
+                        Err(error) => {
+                            warn!("{}: Unable to check -> {}", monitor_id.as_str(), error)
+                        }
                     };
                 }
-                false => trace!(
-                    "{} does not need to be checked yet",
-                    tracker.monitor.monitor_id()
-                ),
+                false => trace!("{}: check not required", monitor_id.as_str()),
             }
         }
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::monitors::rancher_channel_server::RancherChannelServerConfiguration;
+    use crate::monitors::{FrequencyPeriod, FrequencyValue, Monitor, ReleaseTracker};
+
+    fn create_rancher_channel_monitor() -> Box<dyn Monitor> {
+        Box::new(RancherChannelServerConfiguration {
+            url: "https://example.com".to_string(),
+            channel: "stable".to_string(),
+            notification: "test".to_string(),
+            frequency: FrequencyValue(1),
+            period: FrequencyPeriod::Hour,
+        })
+    }
+
+    #[test]
+    fn is_new_release() {
+        let mut tracker =
+            ReleaseTracker::new(create_rancher_channel_monitor(), "v1.0.0-rc1".to_string());
+        assert!(tracker.new_version("v1.1.0-rc1".to_string()))
+    }
+
+    #[test]
+    fn is_not_new_release() {
+        let mut tracker =
+            ReleaseTracker::new(create_rancher_channel_monitor(), "v1.0.0-rc1".to_string());
+        assert!(!tracker.new_version("v1.0.0-rc1".to_string()))
+    }
+
+    #[test]
+    fn release_tracker_is_updated() {
+        const NEW_VERSION: &str = "v1.1.0-rc1";
+        let mut tracker =
+            ReleaseTracker::new(create_rancher_channel_monitor(), "v1.0.0-rc1".to_string());
+        tracker.new_version(NEW_VERSION.to_string());
+        assert_eq!(tracker.version, NEW_VERSION.to_string())
+    }
 }
