@@ -10,6 +10,6 @@ pub struct CliArgs {
     pub config: PathBuf,
 
     /// Set how verbose logging level should be
-    #[clap(short, long, value_enum, default_value = "info")]
-    pub verbosity: LevelFilter,
+    #[clap(short, long, value_enum)]
+    pub verbosity: Option<LevelFilter>,
 }

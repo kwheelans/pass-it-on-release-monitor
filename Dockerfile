@@ -23,10 +23,10 @@ RUN mkdir /pass-it-on-release-monitor
 WORKDIR /pass-it-on-release-monitor
 
 ENV PATH=/pass-it-on-release-monitor:$PATH \
-LOG_LEVEL=Info
+VERBOSITY=Info
 
 RUN apt-get update && apt-get install -y ca-certificates && rm -rf /var/lib/apt/lists/*
 COPY --from=builder /pass-it-on-release-monitor/target/release/pass-it-on-release-monitor /pass-it-on-release-monitor
 VOLUME /config
 
-CMD ["pass-it-on-release-monitor","--config", "/config/monitor.toml", "-v","debug"]
+CMD ["pass-it-on-release-monitor","--config", "/config/monitor.toml"]
