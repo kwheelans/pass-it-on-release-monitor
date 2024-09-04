@@ -7,6 +7,7 @@ use serde::Deserialize;
 use std::time::{Duration, Instant};
 use tokio::sync::mpsc;
 
+pub mod github_release;
 pub mod rancher_channel_server;
 
 #[async_trait]

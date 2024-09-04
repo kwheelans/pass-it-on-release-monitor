@@ -35,4 +35,8 @@ pub enum Error {
     /// Pass-thru `toml::de::Error`.
     #[error("Serde Toml Error: {0}")]
     SerdeToml(#[from] toml::de::Error),
+
+    /// Pass-thru `octocrab::Error`.
+    #[error("Octocrab Error: {0}")]
+    Octocrab(#[from] octocrab::Error),
 }

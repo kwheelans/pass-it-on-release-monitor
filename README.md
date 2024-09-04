@@ -1,7 +1,16 @@
 # pass-it-on-release-monitor
 
+A pass-it-on client to send notifications when a configured monitor detects a new version has been released.
 
 ## Configuration
+
+### Monitor Types
+
+| Monitor         | Description                                                                                            |
+|-----------------|--------------------------------------------------------------------------------------------------------|
+| rancher-channel | Monitor the endpoint created my the [Rancher Channel Server](https://github.com/rancher/channelserver) |
+| github          | Monitor Github releases for a repository                                                               |
+
 
 ### Example
 ```toml
@@ -27,6 +36,12 @@ type = "rancher-channel"
 url = "https://update.k3s.io/v1-release/channels"
 channel = "stable"
 notification = "k3s"
+
+[[monitors.monitor]]
+type = "github"
+owner = "rancher"
+repo = "rancher"
+notification = "rancher-release"
 
 
 ```
