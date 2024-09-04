@@ -19,6 +19,7 @@ pub struct RancherChannelServerConfiguration {
     pub period: FrequencyPeriod,
 }
 
+#[allow(dead_code)]
 #[derive(Deserialize, Debug)]
 #[serde(tag = "type")]
 pub struct Collection {
@@ -30,6 +31,7 @@ pub struct Collection {
     pub resource_type: String,
 }
 
+#[allow(dead_code)]
 #[derive(Deserialize, Debug)]
 #[serde(tag = "type")]
 pub struct Channels {
@@ -39,6 +41,7 @@ pub struct Channels {
     pub links: Links,
 }
 
+#[allow(dead_code)]
 #[derive(Deserialize, Debug)]
 pub struct Links {
     #[serde(rename = "self")]
