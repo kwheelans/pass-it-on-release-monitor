@@ -42,7 +42,7 @@ impl Monitor for GithubConfiguration {
 
     fn monitor_id(&self) -> String {
         format!(
-            "{}-{}/{}",
+            "{}-{}-{}",
             self.monitor_type(),
             self.owner.as_str(),
             self.repo.as_str()
