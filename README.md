@@ -9,7 +9,7 @@ A pass-it-on client to send notifications when a configured monitor detects a ne
 | Monitor         | Description                                                                                            |
 |-----------------|--------------------------------------------------------------------------------------------------------|
 | rancher-channel | Monitor the endpoint created my the [Rancher Channel Server](https://github.com/rancher/channelserver) |
-| github          | Monitor Github releases for a repository                                                               |
+| github          | Monitor Github repository releases                                                                     |
 
 
 ### Example
@@ -42,6 +42,4 @@ type = "github"
 owner = "rancher"
 repo = "rancher"
 notification = "rancher-release"
-
-
 ```
