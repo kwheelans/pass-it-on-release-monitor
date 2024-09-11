@@ -194,14 +194,14 @@ mod tests {
     fn is_new_release() {
         let mut tracker =
             ReleaseTracker::new(create_rancher_channel_monitor(), "v1.0.0-rc1".to_string());
-        assert!(tracker.new_version("v1.1.0-rc1".to_string()))
+        assert!(tracker.new_version("v1.1.0-rc1"))
     }
 
     #[test]
     fn is_not_new_release() {
         let mut tracker =
             ReleaseTracker::new(create_rancher_channel_monitor(), "v1.0.0-rc1".to_string());
-        assert!(!tracker.new_version("v1.0.0-rc1".to_string()))
+        assert!(!tracker.new_version("v1.0.0-rc1"))
     }
 
     #[test]
@@ -209,7 +209,7 @@ mod tests {
         const NEW_VERSION: &str = "v1.1.0-rc1";
         let mut tracker =
             ReleaseTracker::new(create_rancher_channel_monitor(), "v1.0.0-rc1".to_string());
-        tracker.new_version(NEW_VERSION.to_string());
+        tracker.new_version(NEW_VERSION);
         assert_eq!(tracker.version, NEW_VERSION.to_string())
     }
 }
