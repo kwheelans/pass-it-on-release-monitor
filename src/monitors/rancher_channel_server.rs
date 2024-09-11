@@ -1,5 +1,5 @@
 use crate::error::Error;
-use crate::monitors::{FrequencyPeriod, FrequencyValue, Monitor};
+use crate::monitors::{FrequencyPeriod, FrequencyValue, Monitor, ReleaseData};
 use async_trait::async_trait;
 use log::trace;
 use pass_it_on::notifications::{ClientReadyMessage, Message};
@@ -54,14 +54,14 @@ pub struct Actions;
 #[async_trait]
 #[typetag::deserialize(name = "rancher-channel")]
 impl Monitor for RancherChannelServerConfiguration {
-    async fn check(&self) -> Result<String, Error> {
+    async fn check(&self) -> Result<ReleaseData, Error> {
         self.check_channel().await
     }
 
-    fn message(&self, version: &str) -> ClientReadyMessage {
+    fn message(&self, version: ReleaseData) -> ClientReadyMessage {
         Message::new(format!(
             "Version {} now available for channel {} at {}",
-            version,
+            version.version,
             self.channel.as_str(),
             self.url.as_str()
         ))
@@ -92,7 +92,7 @@ impl RancherChannelServerConfiguration {
         Ok(serde_json::from_str(data.as_str())?)
     }
 
-    async fn check_channel(&self) -> Result<String, Error> {
+    async fn check_channel(&self) -> Result<ReleaseData, Error> {
         trace!("Checking Rancher Channels for {}", self.monitor_id());
         let channels = self.get_channels().await?;
 
@@ -106,7 +106,10 @@ impl RancherChannelServerConfiguration {
         {
             Some(channel) => {
                 trace!("Name: {} Version: {}", channel.name, channel.latest);
-                Ok(channel.latest)
+                Ok(ReleaseData {
+                    version: channel.latest,
+                    link: None,
+                })
             }
             None => Err(Error::RancherChannelNotFound(search.to_string())),
         }

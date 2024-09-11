@@ -1,5 +1,5 @@
 use crate::error::Error;
-use crate::monitors::{FrequencyPeriod, FrequencyValue, Monitor};
+use crate::monitors::{FrequencyPeriod, FrequencyValue, Monitor, ReleaseData};
 use async_trait::async_trait;
 use log::trace;
 use pass_it_on::notifications::{ClientReadyMessage, Message};
@@ -22,16 +22,17 @@ pub struct GithubConfiguration {
 #[async_trait]
 #[typetag::deserialize(name = "github")]
 impl Monitor for GithubConfiguration {
-    async fn check(&self) -> Result<String, Error> {
+    async fn check(&self) -> Result<ReleaseData, Error> {
         self.get_latest_release().await
     }
 
-    fn message(&self, version: &str) -> ClientReadyMessage {
+    fn message(&self, version: ReleaseData) -> ClientReadyMessage {
         Message::new(format!(
-            "Release {} now available for {}/{}",
-            version,
+            "Release {} now available for {}/{}. {}",
+            version.version,
             self.owner.as_str(),
-            self.repo.as_str()
+            self.repo.as_str(),
+            version.link.unwrap_or_default()
         ))
         .to_client_ready_message(self.notification.as_str())
     }
@@ -55,7 +56,7 @@ impl Monitor for GithubConfiguration {
 }
 
 impl GithubConfiguration {
-    async fn get_latest_release(&self) -> Result<String, Error> {
+    async fn get_latest_release(&self) -> Result<ReleaseData, Error> {
         trace!(
             "Checking Github latest release for repository {}/{}",
             self.repo.as_str(),
@@ -72,6 +73,10 @@ impl GithubConfiguration {
             self.repo.as_str(),
             self.owner.as_str()
         );
-        Ok(release.tag_name)
+
+        Ok(ReleaseData {
+            version: release.tag_name,
+            link: Some(release.html_url.to_string()),
+        })
     }
 }

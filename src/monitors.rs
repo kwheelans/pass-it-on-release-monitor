@@ -13,8 +13,8 @@ pub mod rancher_channel_server;
 #[async_trait]
 #[typetag::deserialize(tag = "type")]
 pub trait Monitor: Send {
-    async fn check(&self) -> Result<String, Error>;
-    fn message(&self, version: &str) -> ClientReadyMessage;
+    async fn check(&self) -> Result<ReleaseData, Error>;
+    fn message(&self, version: ReleaseData) -> ClientReadyMessage;
     fn monitor_type(&self) -> String;
     fn monitor_id(&self) -> String;
     fn frequency(&self) -> Duration;
@@ -79,14 +79,19 @@ impl ReleaseTracker {
             .ge(&self.monitor.frequency())
     }
 
-    pub fn new_version(&mut self, latest: String) -> bool {
-        let update = self.version.as_str().ne(latest.as_str());
+    pub fn new_version(&mut self, latest: &str) -> bool {
+        let update = self.version.as_str().ne(latest);
         if update {
-            self.version = latest;
+            self.version = latest.to_string();
             self.last_check = Instant::now();
         }
         update
     }
+}
+
+pub struct ReleaseData {
+    pub version: String,
+    pub link: Option<String>,
 }
 
 async fn create_monitor_list(
@@ -96,8 +101,12 @@ async fn create_monitor_list(
     for monitor in monitors {
         match monitor.check().await {
             Ok(version) => {
-                debug!("Initial check got {} for {}", version, monitor.monitor_id());
-                list.push(ReleaseTracker::new(monitor, version));
+                debug!(
+                    "Initial check got {} for {}",
+                    version.version,
+                    monitor.monitor_id()
+                );
+                list.push(ReleaseTracker::new(monitor, version.version));
             }
             Err(error) => {
                 warn!("Unable to add {} due to: {}", monitor.monitor_id(), error)
@@ -131,14 +140,13 @@ pub async fn monitor(
                                 "{}: Checking previous version: {} |-| latest version: {}",
                                 monitor_id.as_str(),
                                 tracker.version.as_str(),
-                                latest.as_str()
+                                latest.version.as_str()
                             );
-                            match tracker.new_version(latest) {
+                            match tracker.new_version(latest.version.as_str()) {
                                 true => {
                                     debug!("{}: Sending notification", monitor_id.as_str());
-                                    if let Err(error) = interface
-                                        .send(tracker.monitor.message(tracker.version.as_str()))
-                                        .await
+                                    if let Err(error) =
+                                        interface.send(tracker.monitor.message(latest)).await
                                     {
                                         warn!(
                                             "{}: Error sending notification -> {}",
