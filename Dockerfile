@@ -10,11 +10,11 @@ WORKDIR /pass-it-on-release-monitor
 
 # Build dependencies
 COPY --from=planner /recipe/recipe.json recipe.json
-RUN cargo chef cook --release --features vendored-tls --recipe-path recipe.json
+RUN cargo chef cook --release --recipe-path recipe.json
 
 # Build application
 COPY . .
-RUN cargo build --release --frozen --features vendored-tls --bin pass-it-on-release-monitor
+RUN cargo build --release --frozen --bin pass-it-on-release-monitor
 
 # Final image
 FROM debian:12-slim
