@@ -1,7 +1,7 @@
 use crate::error::Error;
 use crate::monitors::{FrequencyPeriod, FrequencyValue, Monitor, ReleaseData};
 use async_trait::async_trait;
-use log::trace;
+use tracing::trace;
 use pass_it_on::notifications::{ClientReadyMessage, Message};
 use serde::Deserialize;
 use std::time::Duration;

@@ -1,7 +1,7 @@
 use crate::error::Error;
 use crate::error::Error::NoMonitors;
 use async_trait::async_trait;
-use log::{debug, trace, warn};
+use tracing::{debug, trace, warn};
 use pass_it_on::notifications::ClientReadyMessage;
 use serde::Deserialize;
 use std::time::{Duration, Instant};
