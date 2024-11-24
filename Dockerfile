@@ -19,7 +19,7 @@ RUN cargo build --release --frozen --bin pass-it-on-release-monitor
 # Final image
 FROM debian:12-slim
 
-RUN mkdir /pass-it-on-release-monitor
+RUN mkdir /pass-it-on-release-monitor /data
 WORKDIR /pass-it-on-release-monitor
 
 ENV PATH=/pass-it-on-release-monitor:$PATH \
@@ -28,5 +28,6 @@ VERBOSITY=Info
 RUN apt-get update && apt-get install -y ca-certificates && rm -rf /var/lib/apt/lists/*
 COPY --from=builder /pass-it-on-release-monitor/target/release/pass-it-on-release-monitor /pass-it-on-release-monitor
 VOLUME /config
+VOLUME /data
 
 CMD ["pass-it-on-release-monitor","--config", "/config/monitor.toml"]

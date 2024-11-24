@@ -8,10 +8,6 @@ pub struct CliArgs {
     /// Path to configuration file
     #[clap(short, long, value_parser)]
     pub config: PathBuf,
-    
-    /// Persist the most recent version data to a file
-    #[clap(short, long, value_parser)]
-    pub persist: Option<Option<PathBuf>>,
 
     /// Set how verbose logging level should be
     #[clap(short, long, value_enum)]

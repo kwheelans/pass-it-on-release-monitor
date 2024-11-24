@@ -5,7 +5,6 @@ use pass_it_on::notifications::ClientReadyMessage;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs::File;
-use std::io::Write;
 use std::path::PathBuf;
 use std::time::{Duration, Instant};
 use tokio::sync::mpsc;
@@ -119,10 +118,10 @@ async fn create_monitor_list(
                     .map(|x| (x.monitor_id, x.version))
                     .collect(),
             )
-        },
+        }
         _ => None,
     };
-    
+
     debug!("{:?}", stored_versions);
 
     for monitor in monitors {
@@ -219,9 +218,12 @@ pub async fn monitor(
                 false => trace!("{}: check not required", monitor_id.as_str()),
             }
         }
-        
+
         if (update_store || startup) && persist_path.is_some() {
-            debug!("Updating stored values to file {}", persist_path.as_ref().unwrap().to_string_lossy());
+            debug!(
+                "Updating stored values to file {}",
+                persist_path.as_ref().unwrap().to_string_lossy()
+            );
             let file = File::options()
                 .write(true)
                 .truncate(true)

@@ -3,8 +3,11 @@ use serde::Deserialize;
 
 use crate::monitors::Monitor;
 
+const DEFAULT_DATA_PATH: &str = "release-tracking.json";
+
 #[derive(Deserialize)]
 pub struct MonitorConfigFileParser {
+    pub global: GlobalConfiguration,
     pub monitors: MonitorConfiguration,
     pub client: ClientConfigFile,
 }
@@ -12,6 +15,22 @@ pub struct MonitorConfigFileParser {
 #[derive(Deserialize)]
 pub struct MonitorConfiguration {
     pub monitor: Vec<Box<dyn Monitor>>,
+}
+
+#[derive(Deserialize)]
+#[serde(default)]
+pub struct GlobalConfiguration {
+    pub persist: bool,
+    pub data_path: String,
+}
+
+impl Default for GlobalConfiguration {
+    fn default() -> Self {
+        Self {
+            persist: false,
+            data_path: DEFAULT_DATA_PATH.to_string(),
+        }
+    }
 }
 
 impl TryFrom<&str> for MonitorConfigFileParser {
