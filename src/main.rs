@@ -14,6 +14,9 @@ use std::process::ExitCode;
 use std::str::FromStr;
 use tokio::sync::mpsc;
 use tracing::level_filters::LevelFilter;
+use tracing::log::debug;
+
+const DEFAULT_FILENAME: &str = "release-tracking.json";
 
 #[tokio::main]
 async fn main() -> ExitCode {
@@ -38,6 +41,17 @@ async fn main() -> ExitCode {
 
 async fn run(args: CliArgs) -> Result<(), Error> {
     let config_path = args.config;
+    let persist_path = match args.persist {
+        Some(path) => {
+            match path {
+                None => Some(std::env::current_dir()?.join(DEFAULT_FILENAME)),
+                Some(p) => Some(p),
+            }
+        }
+        None => None,
+    };
+    
+    debug!("Persistence settings: {:?}", persist_path);
 
     if !config_path.is_file() {
         return Err(Error::MissingConfiguration(format!(
@@ -49,7 +63,7 @@ async fn run(args: CliArgs) -> Result<(), Error> {
     let config = MonitorConfigFileParser::try_from(std::fs::read_to_string(config_path)?.as_str())?;
     let (interface_tx, interface_rx) = mpsc::channel(100);
 
-    tokio::spawn(async move { monitor(config.monitors.monitor, interface_tx.clone()).await });
+    tokio::spawn(async move { monitor(config.monitors.monitor, interface_tx.clone(), persist_path).await });
 
     start_client(config.client.try_into()?, interface_rx, None, None).await?;
     Ok(())

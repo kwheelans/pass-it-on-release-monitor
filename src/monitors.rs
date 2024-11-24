@@ -1,11 +1,15 @@
 use crate::error::Error;
 use crate::error::Error::NoMonitors;
 use async_trait::async_trait;
-use tracing::{debug, trace, warn};
 use pass_it_on::notifications::ClientReadyMessage;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::fs::File;
+use std::io::Write;
+use std::path::PathBuf;
 use std::time::{Duration, Instant};
 use tokio::sync::mpsc;
+use tracing::{debug, trace, warn};
 
 pub mod github_release;
 pub mod rancher_channel_server;
@@ -18,6 +22,12 @@ pub trait Monitor: Send {
     fn monitor_type(&self) -> String;
     fn monitor_id(&self) -> String;
     fn frequency(&self) -> Duration;
+}
+
+#[derive(Deserialize, Serialize, Debug)]
+pub struct MonitorStore {
+    pub monitor_id: String,
+    pub version: String,
 }
 
 #[derive(Deserialize, Debug)]
@@ -96,17 +106,53 @@ pub struct ReleaseData {
 
 async fn create_monitor_list(
     monitors: Vec<Box<dyn Monitor>>,
-) -> Result<Vec<ReleaseTracker>, Error> {
-    let mut list = Vec::new();
+    persist_path: Option<PathBuf>,
+) -> Result<HashMap<String, ReleaseTracker>, Error> {
+    let mut list = HashMap::with_capacity(monitors.len());
+    let stored_versions: Option<HashMap<String, String>> = match persist_path {
+        Some(path) if path.exists() => {
+            let reader = std::io::BufReader::new(File::open(path)?);
+            let stored: Vec<MonitorStore> = serde_json::from_reader(reader)?;
+            Some(
+                stored
+                    .into_iter()
+                    .map(|x| (x.monitor_id, x.version))
+                    .collect(),
+            )
+        },
+        _ => None,
+    };
+    
+    debug!("{:?}", stored_versions);
+
     for monitor in monitors {
         match monitor.check().await {
-            Ok(version) => {
-                debug!(
-                    "Initial check got {} for {}",
-                    version.version,
-                    monitor.monitor_id()
-                );
-                list.push(ReleaseTracker::new(monitor, version.version));
+            Ok(release_data) => {
+                let version = match &stored_versions {
+                    None => {
+                        debug!(
+                            "Initial check got {} for {}",
+                            release_data.version,
+                            monitor.monitor_id()
+                        );
+                        release_data.version
+                    }
+                    Some(stored) => {
+                        let stored_version = stored.get(&monitor.monitor_id());
+                        match stored_version {
+                            None => release_data.version,
+                            Some(stored_version) => {
+                                debug!(
+                                    "Using stored version {} for {}",
+                                    stored_version,
+                                    monitor.monitor_id()
+                                );
+                                stored_version.to_string()
+                            }
+                        }
+                    }
+                };
+                list.insert(monitor.monitor_id(), ReleaseTracker::new(monitor, version));
             }
             Err(error) => {
                 warn!("Unable to add {} due to: {}", monitor.monitor_id(), error)
@@ -123,15 +169,17 @@ async fn create_monitor_list(
 pub async fn monitor(
     monitors: Vec<Box<dyn Monitor>>,
     interface: mpsc::Sender<ClientReadyMessage>,
+    persist_path: Option<PathBuf>,
 ) -> Result<(), Error> {
-    let mut monitor_list = create_monitor_list(monitors).await?;
+    let mut monitor_list = create_monitor_list(monitors, persist_path.clone()).await?;
+    let mut startup = true;
+    let mut update_store = true;
 
     while !interface.is_closed() {
         tokio::time::sleep(Duration::from_secs(60)).await;
 
-        for tracker in monitor_list.as_mut_slice() {
-            let monitor_id = tracker.monitor.monitor_id();
-            match tracker.needs_check() {
+        for (monitor_id, tracker) in &mut monitor_list {
+            match tracker.needs_check() || startup {
                 true => {
                     trace!("{}: check required", monitor_id.as_str());
                     match tracker.monitor.check().await {
@@ -144,6 +192,7 @@ pub async fn monitor(
                             );
                             match tracker.new_version(latest.version.as_str()) {
                                 true => {
+                                    update_store = true;
                                     debug!("{}: Sending notification", monitor_id.as_str());
                                     if let Err(error) =
                                         interface.send(tracker.monitor.message(latest)).await
@@ -170,6 +219,26 @@ pub async fn monitor(
                 false => trace!("{}: check not required", monitor_id.as_str()),
             }
         }
+        
+        if (update_store || startup) && persist_path.is_some() {
+            debug!("Updating stored values to file {}", persist_path.as_ref().unwrap().to_string_lossy());
+            let file = File::options()
+                .write(true)
+                .truncate(true)
+                .create(true)
+                .open(persist_path.as_ref().unwrap())?;
+            let writer = std::io::BufWriter::new(file);
+            let monitor_store: Vec<MonitorStore> = monitor_list
+                .iter()
+                .map(|(id, tracker)| MonitorStore {
+                    monitor_id: id.to_string(),
+                    version: tracker.version.to_string(),
+                })
+                .collect();
+            serde_json::to_writer(writer, &monitor_store)?;
+            update_store = false;
+        }
+        startup = false;
     }
 
     Ok(())
