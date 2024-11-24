@@ -1029,9 +1029,9 @@ checksum = "b15813163c1d831bf4a13c3610c05c0d03b39feb07f7e09fa234dac9b15aaf39"
 
 [[package]]
 name = "pass-it-on"
-version = "0.16.1"
+version = "0.16.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cf113f978a4e72efae5f3f1a6a64a0c3f0d614877ff871d639a83eb8bc189bfa"
+checksum = "288ab556aed4bb55eb238e622e6389385eda5fbe1dbccf6eedcb46ec845a7666"
 dependencies = [
  "async-trait",
  "blake3",
@@ -1039,7 +1039,7 @@ dependencies = [
  "reqwest",
  "serde",
  "serde_json",
- "thiserror 1.0.69",
+ "thiserror 2.0.3",
  "tokio",
  "toml",
  "tracing",
