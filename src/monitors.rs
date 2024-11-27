@@ -4,23 +4,26 @@ use async_trait::async_trait;
 use pass_it_on::notifications::ClientReadyMessage;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::fmt::Debug;
 use std::fs::File;
 use std::path::PathBuf;
 use std::time::{Duration, Instant};
 use tokio::sync::mpsc;
 use tracing::{debug, trace, warn};
+use crate::configuration::GlobalConfiguration;
 
 pub mod github_release;
 pub mod rancher_channel_server;
 
 #[async_trait]
 #[typetag::deserialize(tag = "type")]
-pub trait Monitor: Send {
+pub trait Monitor: Send + Debug {
     async fn check(&self) -> Result<ReleaseData, Error>;
     fn message(&self, version: ReleaseData) -> ClientReadyMessage;
     fn monitor_type(&self) -> String;
     fn monitor_id(&self) -> String;
     fn frequency(&self) -> Duration;
+    fn set_global_configs(&mut self, configs: &GlobalConfiguration);
 }
 
 #[derive(Deserialize, Serialize, Debug)]
@@ -106,6 +109,7 @@ pub struct ReleaseData {
 async fn create_monitor_list(
     monitors: Vec<Box<dyn Monitor>>,
     persist_path: Option<PathBuf>,
+    global_configs: GlobalConfiguration,
 ) -> Result<HashMap<String, ReleaseTracker>, Error> {
     let mut list = HashMap::with_capacity(monitors.len());
     let stored_versions: Option<HashMap<String, String>> = match persist_path {
@@ -124,7 +128,8 @@ async fn create_monitor_list(
 
     debug!("{:?}", stored_versions);
 
-    for monitor in monitors {
+    for mut monitor in monitors {
+        monitor.set_global_configs(&global_configs);
         match monitor.check().await {
             Ok(release_data) => {
                 let version = match &stored_versions {
@@ -168,11 +173,17 @@ async fn create_monitor_list(
 pub async fn monitor(
     monitors: Vec<Box<dyn Monitor>>,
     interface: mpsc::Sender<ClientReadyMessage>,
-    persist_path: Option<PathBuf>,
+    global_configs: GlobalConfiguration,
 ) -> Result<(), Error> {
-    let mut monitor_list = create_monitor_list(monitors, persist_path.clone()).await?;
     let mut startup = true;
     let mut update_store = true;
+    let persist_path = match global_configs.persist {
+        true => Some(global_configs.data_path.as_str().into()),
+        false => None,
+    };
+    debug!("Persistence settings: {:?}", persist_path);
+    let mut monitor_list = create_monitor_list(monitors, persist_path.clone(), global_configs).await?;
+    
 
     while !interface.is_closed() {
         tokio::time::sleep(Duration::from_secs(60)).await;

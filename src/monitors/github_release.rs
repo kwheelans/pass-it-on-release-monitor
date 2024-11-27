@@ -5,6 +5,7 @@ use pass_it_on::notifications::{ClientReadyMessage, Message};
 use serde::Deserialize;
 use std::time::Duration;
 use tracing::trace;
+use crate::configuration::GlobalConfiguration;
 
 const TYPE_NAME: &str = "github";
 
@@ -17,6 +18,8 @@ pub struct GithubConfiguration {
     pub frequency: FrequencyValue,
     #[serde(default)]
     pub period: FrequencyPeriod,
+    #[serde(default)]
+    pub github_personal_token: Option<String>,
 }
 
 #[async_trait]
@@ -53,6 +56,12 @@ impl Monitor for GithubConfiguration {
     fn frequency(&self) -> Duration {
         self.period.to_duration(self.frequency.0)
     }
+
+    fn set_global_configs(&mut self, configs: &GlobalConfiguration) {
+        if self.github_personal_token.is_none() && configs.github_personal_token.is_some() {
+            self.github_personal_token = configs.github_personal_token.clone();
+        }
+    }
 }
 
 impl GithubConfiguration {
@@ -62,11 +71,18 @@ impl GithubConfiguration {
             self.repo.as_str(),
             self.owner.as_str()
         );
-        let release = octocrab::instance()
-            .repos(self.owner.as_str(), self.repo.as_str())
-            .releases()
-            .get_latest()
-            .await?;
+        let release = {
+            let instance = match &self.github_personal_token {
+                None => octocrab::OctocrabBuilder::default().build()?,
+                Some(token) => octocrab::OctocrabBuilder::default().personal_token(token.as_str()).build()?
+
+            };
+            instance
+                .repos(self.owner.as_str(), self.repo.as_str())
+                .releases()
+                .get_latest()
+                .await?
+        };
         trace!(
             "Found Github latest release {} for repository {}/{}",
             release.tag_name.as_str(),

@@ -4,7 +4,7 @@ mod error;
 mod monitors;
 
 use crate::cli::CliArgs;
-use crate::configuration::MonitorConfigFileParser;
+use crate::configuration::ReleaseMonitorConfiguration;
 use crate::error::Error;
 use crate::monitors::monitor;
 use clap::Parser;
@@ -46,16 +46,12 @@ async fn run(args: CliArgs) -> Result<(), Error> {
         )));
     }
 
-    let config = MonitorConfigFileParser::try_from(std::fs::read_to_string(config_path)?.as_str())?;
+    let config = ReleaseMonitorConfiguration::try_from(std::fs::read_to_string(config_path)?.as_str())?;
+    debug!("{:?}", config);
     let (interface_tx, interface_rx) = mpsc::channel(100);
-    let persist_path = match config.global.persist {
-        true => Some(config.global.data_path.into()),
-        false => None,
-    };
-    debug!("Persistence settings: {:?}", persist_path);
-
+    
     tokio::spawn(async move {
-        monitor(config.monitors.monitor, interface_tx.clone(), persist_path).await
+        monitor(config.monitors.monitor, interface_tx.clone(), config.global).await
     });
 
     start_client(config.client.try_into()?, interface_rx, None, None).await?;

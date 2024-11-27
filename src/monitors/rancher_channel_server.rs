@@ -5,6 +5,7 @@ use pass_it_on::notifications::{ClientReadyMessage, Message};
 use serde::Deserialize;
 use std::time::Duration;
 use tracing::trace;
+use crate::configuration::GlobalConfiguration;
 
 const TYPE_NAME: &str = "rancher-channel";
 
@@ -83,6 +84,10 @@ impl Monitor for RancherChannelServerConfiguration {
 
     fn frequency(&self) -> Duration {
         self.period.to_duration(self.frequency.0)
+    }
+
+    fn set_global_configs(&mut self, _configs: &GlobalConfiguration) {
+        //Nothing to do
     }
 }
 
