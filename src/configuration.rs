@@ -7,6 +7,7 @@ const DEFAULT_DATA_PATH: &str = "release-tracking.json";
 
 #[derive(Deserialize, Debug)]
 pub struct ReleaseMonitorConfiguration {
+    #[serde(default)]
     pub global: GlobalConfiguration,
     pub monitors: MonitorConfiguration,
     pub client: ClientConfigFile,
