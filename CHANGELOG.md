@@ -4,7 +4,8 @@
 
 ## Changes
 - update `thiserror` dependency  to version 2.x.y
-- update `octocrab` dependency  to version 0.42.y
+- update `octocrab` dependency  to version 0.43.y
+- update rust edition to 2024
 
 # v0.2.0
 ## Changes
