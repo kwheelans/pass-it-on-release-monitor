@@ -2,8 +2,8 @@
 name = "pass-it-on-release-monitor"
 version = "0.2.0"
 authors = ["Kevin Wheelans <kevin.wheelans@proton.me>"]
-edition = "2021"
-rust-version = "1.70"
+edition = "2024"
+rust-version = "1.85"
 description = "A pass-it-on client to send notifications when a configured monitor detects a new version has been released"
 homepage = "https://github.com/kwheelans/pass-it-on-release-monitor"
 license = "MIT"
