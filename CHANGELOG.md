@@ -1,4 +1,6 @@
 # Unreleased
+
+# v0.3.0
 ## Features
 - add option to persist versions to file between startups
 
