@@ -1,6 +1,6 @@
 [package]
 name = "pass-it-on-release-monitor"
-version = "0.3.0"
+version = "0.3.1"
 authors = ["Kevin Wheelans <kevin.wheelans@proton.me>"]
 edition = "2024"
 rust-version = "1.85"

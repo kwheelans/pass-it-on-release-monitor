@@ -1051,7 +1051,7 @@ dependencies = [
 
 [[package]]
 name = "pass-it-on-release-monitor"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "async-trait",
  "clap",
