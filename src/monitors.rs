@@ -1,3 +1,4 @@
+use sea_orm_migration::prelude::*;
 use crate::error::Error;
 use crate::error::Error::NoMonitors;
 use async_trait::async_trait;
@@ -5,12 +6,13 @@ use pass_it_on::notifications::ClientReadyMessage;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fmt::Debug;
-use std::fs::File;
-use std::path::PathBuf;
 use std::time::{Duration, Instant};
+use sea_orm::{ActiveValue, Database, DatabaseConnection, EntityTrait};
 use tokio::sync::mpsc;
-use tracing::{debug, trace, warn};
-use crate::configuration::GlobalConfiguration;
+use tracing::{debug, error, trace, warn};
+use crate::configuration::{GlobalConfiguration};
+use crate::database::{Migrator, MonitorsEntity, MonitorsEntityActiveModel};
+use crate::database::m20250519_000001_create_monitor_table::Monitors;
 
 pub mod github_release;
 pub mod rancher_channel_server;
@@ -92,7 +94,7 @@ impl ReleaseTracker {
     }
 
     pub fn new_version(&mut self, latest: &str) -> bool {
-        let update = self.version.as_str().ne(latest);
+        let update = PartialEq::ne(self.version.as_str(), latest);
         if update {
             self.version = latest.to_string();
             self.last_check = Instant::now();
@@ -108,18 +110,17 @@ pub struct ReleaseData {
 
 async fn create_monitor_list(
     monitors: Vec<Box<dyn Monitor>>,
-    persist_path: Option<PathBuf>,
+    persist_path: &Option<DatabaseConnection>,
     global_configs: GlobalConfiguration,
 ) -> Result<HashMap<String, ReleaseTracker>, Error> {
     let mut list = HashMap::with_capacity(monitors.len());
     let stored_versions: Option<HashMap<String, String>> = match persist_path {
-        Some(path) if path.exists() => {
-            let reader = std::io::BufReader::new(File::open(path)?);
-            let stored: Vec<MonitorStore> = serde_json::from_reader(reader)?;
+        Some(db) => {
+            let selected = MonitorsEntity::find().all(db).await.expect("Couldn't select");
             Some(
-                stored
+                selected
                     .into_iter()
-                    .map(|x| (x.monitor_id, x.version))
+                    .map(|x| (x.id, x.version))
                     .collect(),
             )
         }
@@ -177,13 +178,18 @@ pub async fn monitor(
 ) -> Result<(), Error> {
     let mut startup = true;
     let mut update_store = true;
-    let persist_path = match global_configs.persist {
-        true => Some(global_configs.data_path.as_str().into()),
-        false => None,
+    let db = match Database::connect(format!("{}{}", global_configs.uri.as_str(), "?mode=rwc")).await {
+        Ok(db) => {
+            Migrator::up(&db, None).await?;
+            Some(db)
+        },
+        Err(e) => {
+            error!("{}",e );
+            None
+        }
     };
-    debug!("Persistence settings: {:?}", persist_path);
-    let mut monitor_list = create_monitor_list(monitors, persist_path.clone(), global_configs).await?;
-    
+    let mut monitor_list = create_monitor_list(monitors, &db, global_configs).await?;
+    let on_conflict = OnConflict::column(Monitors::Id).update_column(Monitors::Version).to_owned();
 
     while !interface.is_closed() {
         tokio::time::sleep(Duration::from_secs(60)).await;
@@ -230,31 +236,31 @@ pub async fn monitor(
             }
         }
 
-        if (update_store || startup) && persist_path.is_some() {
+        if (update_store || startup) && db.is_some() {
+            let db = db.as_ref().unwrap();
             debug!(
-                "Updating stored values to file {}",
-                persist_path.as_ref().unwrap().to_string_lossy()
+                "Updating stored values to database",
             );
-            let file = File::options()
-                .write(true)
-                .truncate(true)
-                .create(true)
-                .open(persist_path.as_ref().unwrap())?;
-            let writer = std::io::BufWriter::new(file);
-            let monitor_store: Vec<MonitorStore> = monitor_list
+
+            let monitor_store: Vec<_> = monitor_list
                 .iter()
-                .map(|(id, tracker)| MonitorStore {
-                    monitor_id: id.to_string(),
-                    version: tracker.version.to_string(),
-                })
+                .map(|(id, tracker)| monitor_entity(id, tracker.version.as_str() ))
                 .collect();
-            serde_json::to_writer(writer, &monitor_store)?;
+            MonitorsEntity::insert_many(monitor_store).on_conflict(on_conflict.clone()).exec(db).await?;
             update_store = false;
         }
         startup = false;
     }
 
     Ok(())
+}
+
+fn monitor_entity(monitor_id: &str, version: &str) -> MonitorsEntityActiveModel {
+    MonitorsEntityActiveModel {
+        id: ActiveValue::Set(monitor_id.to_owned()),
+        version: ActiveValue::Set(version.to_owned()),
+        ..Default::default()
+    }
 }
 
 #[cfg(test)]

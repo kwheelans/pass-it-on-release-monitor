@@ -1,9 +1,9 @@
 use pass_it_on::ClientConfigFile;
 use serde::Deserialize;
-
 use crate::monitors::Monitor;
 
-const DEFAULT_DATA_PATH: &str = "release-tracking.json";
+const DEFAULT_DATA_PATH: &str = "sqlite://release-monitor.sqlite";
+
 
 #[derive(Deserialize, Debug)]
 pub struct ReleaseMonitorConfiguration {
@@ -22,15 +22,15 @@ pub struct MonitorConfiguration {
 #[serde(default)]
 pub struct GlobalConfiguration {
     pub persist: bool,
-    pub data_path: String,
+    pub uri: String,
     pub github_personal_token: Option<String>,
 }
 
 impl Default for GlobalConfiguration {
     fn default() -> Self {
         Self {
-            persist: false,
-            data_path: DEFAULT_DATA_PATH.to_string(),
+            persist: true,
+            uri: DEFAULT_DATA_PATH.to_string(),
             github_personal_token: None
         }
     }

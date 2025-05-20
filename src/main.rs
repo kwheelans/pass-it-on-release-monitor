@@ -2,6 +2,7 @@ mod cli;
 mod configuration;
 mod error;
 mod monitors;
+mod database;
 
 use crate::cli::CliArgs;
 use crate::configuration::ReleaseMonitorConfiguration;

@@ -39,4 +39,8 @@ pub enum Error {
     /// Pass-thru `octocrab::Error`.
     #[error("Octocrab Error: {0}")]
     Octocrab(#[from] octocrab::Error),
+
+    /// Pass-thru `sea_orm::error::DbErr`.
+    #[error("Database Error: {0}")]
+    Database(#[from] sea_orm::error::DbErr)
 }
