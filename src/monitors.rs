@@ -1,18 +1,17 @@
-use sea_orm_migration::prelude::*;
+use crate::configuration::GlobalConfiguration;
+use crate::database::{VersionEntity, VersionEntityActiveModel, version};
 use crate::error::Error;
 use crate::error::Error::NoMonitors;
 use async_trait::async_trait;
 use pass_it_on::notifications::ClientReadyMessage;
+use sea_orm::sea_query::OnConflict;
+use sea_orm::{ActiveValue, Database, DatabaseConnection, EntityTrait};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fmt::Debug;
 use std::time::{Duration, Instant};
-use sea_orm::{ActiveValue, Database, DatabaseConnection, EntityTrait};
 use tokio::sync::mpsc;
-use tracing::{debug, error, trace, warn};
-use crate::configuration::{GlobalConfiguration};
-use crate::database::{Migrator, VersionEntity, VersionEntityActiveModel};
-use crate::database::m20250519_000001_create_version_table::Version;
+use tracing::{debug, trace, warn};
 
 pub mod github_release;
 pub mod rancher_channel_server;
@@ -111,8 +110,8 @@ async fn create_monitor_list(
     let mut list = HashMap::with_capacity(monitors.len());
     let stored_versions: Option<HashMap<String, String>> = match persist_path {
         Some(db) => {
-            let selected = VersionEntity::find().all(db).await.expect("Couldn't select");
-            debug!("{:?}", selected);
+            let selected = VersionEntity::find().all(db).await?;
+            debug!("selected: {:?}", selected);
             Some(
                 selected
                     .into_iter()
@@ -123,7 +122,7 @@ async fn create_monitor_list(
         _ => None,
     };
 
-    debug!("{:?}", stored_versions);
+    debug!("stored_versions: {:?}", stored_versions);
 
     for mut monitor in monitors {
         monitor.set_global_configs(&global_configs);
@@ -174,18 +173,19 @@ pub async fn monitor(
 ) -> Result<(), Error> {
     let mut startup = true;
     let mut update_store = true;
-    let db = match Database::connect(format!("{}{}", global_configs.uri.as_str(), "?mode=rwc")).await {
-        Ok(db) => {
-            Migrator::up(&db, None).await?;
-            Some(db)
-        },
-        Err(e) => {
-            error!("{}",e );
-            None
-        }
-    };
+    let monitor_id_update_on_conflict = OnConflict::column(version::Column::MonitorId)
+        .update_column(version::Column::Version)
+        .to_owned();
+
+    let db = Database::connect(format!("{}{}", global_configs.uri.as_str(), "?mode=rwc")).await?;
+    db.get_schema_builder()
+        .register(version::Entity)
+        .sync(&db)
+        .await?;
+    let db = Some(db);
+
+    debug!("Getting monitor_list with create_monitor_list");
     let mut monitor_list = create_monitor_list(monitors, &db, global_configs).await?;
-    let on_conflict = OnConflict::column(Version::MonitorId).update_column(Version::Version).to_owned();
 
     while !interface.is_closed() {
         tokio::time::sleep(Duration::from_secs(60)).await;
@@ -232,17 +232,17 @@ pub async fn monitor(
             }
         }
 
-        if (update_store || startup) && db.is_some() {
-            let db = db.as_ref().unwrap();
-            debug!(
-                "Updating stored values to database",
-            );
+        if (update_store || startup) && let Some(db) = db.as_ref() {
+            debug!("Updating stored values to database",);
 
             let monitor_store: Vec<_> = monitor_list
                 .iter()
-                .map(|(id, tracker)| monitor_entity(id, tracker.version.as_str() ))
+                .map(|(id, tracker)| monitor_entity(id, tracker.version.as_str()))
                 .collect();
-            VersionEntity::insert_many(monitor_store).on_conflict(on_conflict.clone()).exec(db).await?;
+            VersionEntity::insert_many(monitor_store)
+                .on_conflict(monitor_id_update_on_conflict.clone())
+                .exec(db)
+                .await?;
             update_store = false;
         }
         startup = false;
@@ -254,7 +254,7 @@ pub async fn monitor(
 fn monitor_entity(monitor_id: &str, version: &str) -> VersionEntityActiveModel {
     VersionEntityActiveModel {
         monitor_id: ActiveValue::Set(monitor_id.to_owned()),
-        version: ActiveValue::Set(version.to_owned())
+        version: ActiveValue::Set(version.to_owned()),
     }
 }
 
