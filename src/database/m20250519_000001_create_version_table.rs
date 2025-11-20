@@ -9,11 +9,10 @@ impl MigrationTrait for Migration {
         manager
             .create_table(
                 Table::create()
-                    .table(Monitors::Table)
+                    .table(Version::Table)
                     .if_not_exists()
-                    .col(pk_uuid(Monitors::Id))
-                    .col(string(Monitors::MonitorType))
-                    .col(string_null(Monitors::Version))
+                    .col(pk_uuid(Version::MonitorId))
+                    .col(string_null(Version::Version))
                     .to_owned(),
             )
             .await
@@ -21,15 +20,14 @@ impl MigrationTrait for Migration {
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         manager
-            .drop_table(Table::drop().table(Monitors::Table).to_owned())
+            .drop_table(Table::drop().table(Version::Table).to_owned())
             .await
     }
 }
 
 #[derive(DeriveIden)]
-pub enum Monitors {
+pub enum Version {
     Table,
-    Id,
-    MonitorType,
+    MonitorId,
     Version,
 }

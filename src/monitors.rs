@@ -11,8 +11,8 @@ use sea_orm::{ActiveValue, Database, DatabaseConnection, EntityTrait};
 use tokio::sync::mpsc;
 use tracing::{debug, error, trace, warn};
 use crate::configuration::{GlobalConfiguration};
-use crate::database::{Migrator, MonitorsEntity, MonitorsEntityActiveModel};
-use crate::database::m20250519_000001_create_monitor_table::Monitors;
+use crate::database::{Migrator, VersionEntity, VersionEntityActiveModel};
+use crate::database::m20250519_000001_create_version_table::Version;
 
 pub mod github_release;
 pub mod rancher_channel_server;
@@ -34,22 +34,17 @@ pub struct MonitorStore {
     pub version: String,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Default)]
 pub enum FrequencyPeriod {
     #[serde(alias = "minute")]
     Minute,
+    #[default]
     #[serde(alias = "hour")]
     Hour,
     #[serde(alias = "day")]
     Day,
     #[serde(alias = "week")]
     Week,
-}
-
-impl Default for FrequencyPeriod {
-    fn default() -> Self {
-        Self::Hour
-    }
 }
 
 impl FrequencyPeriod {
@@ -116,11 +111,12 @@ async fn create_monitor_list(
     let mut list = HashMap::with_capacity(monitors.len());
     let stored_versions: Option<HashMap<String, String>> = match persist_path {
         Some(db) => {
-            let selected = MonitorsEntity::find().all(db).await.expect("Couldn't select");
+            let selected = VersionEntity::find().all(db).await.expect("Couldn't select");
+            debug!("{:?}", selected);
             Some(
                 selected
                     .into_iter()
-                    .map(|x| (x.id, x.version))
+                    .map(|x| (x.monitor_id, x.version))
                     .collect(),
             )
         }
@@ -189,7 +185,7 @@ pub async fn monitor(
         }
     };
     let mut monitor_list = create_monitor_list(monitors, &db, global_configs).await?;
-    let on_conflict = OnConflict::column(Monitors::Id).update_column(Monitors::Version).to_owned();
+    let on_conflict = OnConflict::column(Version::MonitorId).update_column(Version::Version).to_owned();
 
     while !interface.is_closed() {
         tokio::time::sleep(Duration::from_secs(60)).await;
@@ -246,7 +242,7 @@ pub async fn monitor(
                 .iter()
                 .map(|(id, tracker)| monitor_entity(id, tracker.version.as_str() ))
                 .collect();
-            MonitorsEntity::insert_many(monitor_store).on_conflict(on_conflict.clone()).exec(db).await?;
+            VersionEntity::insert_many(monitor_store).on_conflict(on_conflict.clone()).exec(db).await?;
             update_store = false;
         }
         startup = false;
@@ -255,11 +251,10 @@ pub async fn monitor(
     Ok(())
 }
 
-fn monitor_entity(monitor_id: &str, version: &str) -> MonitorsEntityActiveModel {
-    MonitorsEntityActiveModel {
-        id: ActiveValue::Set(monitor_id.to_owned()),
-        version: ActiveValue::Set(version.to_owned()),
-        ..Default::default()
+fn monitor_entity(monitor_id: &str, version: &str) -> VersionEntityActiveModel {
+    VersionEntityActiveModel {
+        monitor_id: ActiveValue::Set(monitor_id.to_owned()),
+        version: ActiveValue::Set(version.to_owned())
     }
 }
 
