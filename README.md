@@ -14,6 +14,9 @@ A pass-it-on client to send notifications when a configured monitor detects a ne
 
 ### Example
 ```toml
+[global]
+uri = "sqlite://test_data/release-monitor.sqlite?mode=rwc"
+
 [client]
 key = "change me"
 

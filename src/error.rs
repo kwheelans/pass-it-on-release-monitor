@@ -42,5 +42,5 @@ pub enum Error {
 
     /// Pass-thru `sea_orm::error::DbErr`.
     #[error("Database Error: {0}")]
-    Database(#[from] sea_orm::error::DbErr)
+    Database(#[from] sea_orm::error::DbErr),
 }

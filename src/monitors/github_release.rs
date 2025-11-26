@@ -1,3 +1,4 @@
+use crate::configuration::GlobalConfiguration;
 use crate::error::Error;
 use crate::monitors::{FrequencyPeriod, FrequencyValue, Monitor, ReleaseData};
 use async_trait::async_trait;
@@ -5,7 +6,6 @@ use pass_it_on::notifications::{ClientReadyMessage, Message};
 use serde::Deserialize;
 use std::time::Duration;
 use tracing::trace;
-use crate::configuration::GlobalConfiguration;
 
 const TYPE_NAME: &str = "github";
 
@@ -74,8 +74,9 @@ impl GithubConfiguration {
         let release = {
             let instance = match &self.github_personal_token {
                 None => octocrab::OctocrabBuilder::default().build()?,
-                Some(token) => octocrab::OctocrabBuilder::default().personal_token(token.as_str()).build()?
-
+                Some(token) => octocrab::OctocrabBuilder::default()
+                    .personal_token(token.as_str())
+                    .build()?,
             };
             instance
                 .repos(self.owner.as_str(), self.repo.as_str())

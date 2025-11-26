@@ -5,8 +5,8 @@ use crate::error::Error::NoMonitors;
 use async_trait::async_trait;
 use pass_it_on::notifications::ClientReadyMessage;
 use sea_orm::sea_query::OnConflict;
-use sea_orm::{ActiveValue, Database, DatabaseConnection, EntityTrait};
-use serde::{Deserialize, Serialize};
+use sea_orm::{ActiveValue, DatabaseConnection, EntityTrait};
+use serde::Deserialize;
 use std::collections::HashMap;
 use std::fmt::Debug;
 use std::time::{Duration, Instant};
@@ -25,12 +25,6 @@ pub trait Monitor: Send + Debug {
     fn monitor_id(&self) -> String;
     fn frequency(&self) -> Duration;
     fn set_global_configs(&mut self, configs: &GlobalConfiguration);
-}
-
-#[derive(Deserialize, Serialize, Debug)]
-pub struct MonitorStore {
-    pub monitor_id: String,
-    pub version: String,
 }
 
 #[derive(Deserialize, Debug, Default)]
@@ -104,31 +98,29 @@ pub struct ReleaseData {
 
 async fn create_monitor_list(
     monitors: Vec<Box<dyn Monitor>>,
-    persist_path: &Option<DatabaseConnection>,
+    db: &DatabaseConnection,
     global_configs: GlobalConfiguration,
 ) -> Result<HashMap<String, ReleaseTracker>, Error> {
     let mut list = HashMap::with_capacity(monitors.len());
-    let stored_versions: Option<HashMap<String, String>> = match persist_path {
-        Some(db) => {
-            let selected = VersionEntity::find().all(db).await?;
-            debug!("selected: {:?}", selected);
-            Some(
-                selected
-                    .into_iter()
-                    .map(|x| (x.monitor_id, x.version))
-                    .collect(),
-            )
-        }
-        _ => None,
+    let stored_versions: HashMap<String, String> = {
+        let selected = VersionEntity::find().all(db).await?;
+        debug!("selected: {:?}", selected);
+        selected
+            .into_iter()
+            .map(|x| (x.monitor_id, x.version))
+            .collect()
     };
 
-    debug!("stored_versions: {:?}", stored_versions);
+    debug!("stored_versions from database: {:?}", stored_versions);
 
     for mut monitor in monitors {
         monitor.set_global_configs(&global_configs);
+
+        // Initial check of monitors
         match monitor.check().await {
             Ok(release_data) => {
-                let version = match &stored_versions {
+                let stored_version = stored_versions.get(&monitor.monitor_id());
+                let version = match stored_version {
                     None => {
                         debug!(
                             "Initial check got {} for {}",
@@ -137,19 +129,13 @@ async fn create_monitor_list(
                         );
                         release_data.version
                     }
-                    Some(stored) => {
-                        let stored_version = stored.get(&monitor.monitor_id());
-                        match stored_version {
-                            None => release_data.version,
-                            Some(stored_version) => {
-                                debug!(
-                                    "Using stored version {} for {}",
-                                    stored_version,
-                                    monitor.monitor_id()
-                                );
-                                stored_version.to_string()
-                            }
-                        }
+                    Some(stored_version) => {
+                        debug!(
+                            "Using stored version {} for {}",
+                            stored_version,
+                            monitor.monitor_id()
+                        );
+                        stored_version.to_string()
                     }
                 };
                 list.insert(monitor.monitor_id(), ReleaseTracker::new(monitor, version));
@@ -170,6 +156,7 @@ pub async fn monitor(
     monitors: Vec<Box<dyn Monitor>>,
     interface: mpsc::Sender<ClientReadyMessage>,
     global_configs: GlobalConfiguration,
+    db: &DatabaseConnection,
 ) -> Result<(), Error> {
     let mut startup = true;
     let mut update_store = true;
@@ -177,15 +164,8 @@ pub async fn monitor(
         .update_column(version::Column::Version)
         .to_owned();
 
-    let db = Database::connect(format!("{}{}", global_configs.uri.as_str(), "?mode=rwc")).await?;
-    db.get_schema_builder()
-        .register(version::Entity)
-        .sync(&db)
-        .await?;
-    let db = Some(db);
-
     debug!("Getting monitor_list with create_monitor_list");
-    let mut monitor_list = create_monitor_list(monitors, &db, global_configs).await?;
+    let mut monitor_list = create_monitor_list(monitors, db, global_configs).await?;
 
     while !interface.is_closed() {
         tokio::time::sleep(Duration::from_secs(60)).await;
@@ -216,7 +196,6 @@ pub async fn monitor(
                                         )
                                     }
                                 }
-
                                 false => trace!(
                                     "{}: Both previous and latest version are equal",
                                     monitor_id.as_str()
@@ -232,13 +211,13 @@ pub async fn monitor(
             }
         }
 
-        if (update_store || startup) && let Some(db) = db.as_ref() {
-            debug!("Updating stored values to database",);
-
+        if update_store || startup {
+            debug!("Updating in memory values to database",);
             let monitor_store: Vec<_> = monitor_list
                 .iter()
                 .map(|(id, tracker)| monitor_entity(id, tracker.version.as_str()))
                 .collect();
+
             VersionEntity::insert_many(monitor_store)
                 .on_conflict(monitor_id_update_on_conflict.clone())
                 .exec(db)

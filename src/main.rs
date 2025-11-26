@@ -1,21 +1,25 @@
 mod cli;
 mod configuration;
+mod database;
 mod error;
 mod monitors;
-mod database;
 
 use crate::cli::CliArgs;
 use crate::configuration::ReleaseMonitorConfiguration;
+use crate::database::version;
 use crate::error::Error;
 use crate::monitors::monitor;
 use clap::Parser;
 use pass_it_on::start_client;
+use sea_orm::Database;
 use std::process::ExitCode;
 use std::str::FromStr;
 use tokio::sync::mpsc;
 use tracing::level_filters::LevelFilter;
 use tracing::log::debug;
 use tracing::{error, info};
+
+const SQLITE_MEMORY: &str = "sqlite::memory:";
 
 #[tokio::main]
 async fn main() -> ExitCode {
@@ -39,6 +43,7 @@ async fn main() -> ExitCode {
 }
 
 async fn run(args: CliArgs) -> Result<(), Error> {
+    // Get configuration
     let config_path = args.config;
     if !config_path.is_file() {
         return Err(Error::MissingConfiguration(format!(
@@ -46,15 +51,36 @@ async fn run(args: CliArgs) -> Result<(), Error> {
             config_path.to_string_lossy()
         )));
     }
-
-    let config = ReleaseMonitorConfiguration::try_from(std::fs::read_to_string(config_path)?.as_str())?;
+    let config =
+        ReleaseMonitorConfiguration::try_from(std::fs::read_to_string(config_path)?.as_str())?;
     debug!("{:?}", config);
+
+    // Get database connection
+    let db_uri = match config.global.persist {
+        true => config.global.uri.as_str(),
+        false => SQLITE_MEMORY,
+    };
+    let db = Database::connect(db_uri).await?;
+    db.get_schema_builder()
+        .register(version::Entity)
+        .sync(&db)
+        .await?;
+
+    // Setup channel
     let (interface_tx, interface_rx) = mpsc::channel(100);
-    
+
+    // Start monitor task
     tokio::spawn(async move {
-        monitor(config.monitors.monitor, interface_tx.clone(), config.global).await
+        monitor(
+            config.monitors.monitor,
+            interface_tx.clone(),
+            config.global,
+            &db,
+        )
+        .await
     });
 
+    // Start Pass-It-On client
     start_client(config.client.try_into()?, interface_rx, None, None).await?;
     Ok(())
 }
