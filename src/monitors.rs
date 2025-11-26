@@ -60,6 +60,11 @@ impl Default for FrequencyValue {
     }
 }
 
+pub struct ReleaseData {
+    pub version: String,
+    pub link: Option<String>,
+}
+
 struct ReleaseTracker {
     monitor: Box<dyn Monitor>,
     version: String,
@@ -88,67 +93,6 @@ impl ReleaseTracker {
             self.last_check = Instant::now();
         }
         update
-    }
-}
-
-pub struct ReleaseData {
-    pub version: String,
-    pub link: Option<String>,
-}
-
-async fn create_monitor_list(
-    monitors: Vec<Box<dyn Monitor>>,
-    db: &DatabaseConnection,
-    global_configs: GlobalConfiguration,
-) -> Result<HashMap<String, ReleaseTracker>, Error> {
-    let mut list = HashMap::with_capacity(monitors.len());
-    let stored_versions: HashMap<String, String> = {
-        let selected = VersionEntity::find().all(db).await?;
-        debug!("selected: {:?}", selected);
-        selected
-            .into_iter()
-            .map(|x| (x.monitor_id, x.version))
-            .collect()
-    };
-
-    debug!("stored_versions from database: {:?}", stored_versions);
-
-    for mut monitor in monitors {
-        monitor.set_global_configs(&global_configs);
-
-        // Initial check of monitors
-        match monitor.check().await {
-            Ok(release_data) => {
-                let stored_version = stored_versions.get(&monitor.monitor_id());
-                let version = match stored_version {
-                    None => {
-                        debug!(
-                            "Initial check got {} for {}",
-                            release_data.version,
-                            monitor.monitor_id()
-                        );
-                        release_data.version
-                    }
-                    Some(stored_version) => {
-                        debug!(
-                            "Using stored version {} for {}",
-                            stored_version,
-                            monitor.monitor_id()
-                        );
-                        stored_version.to_string()
-                    }
-                };
-                list.insert(monitor.monitor_id(), ReleaseTracker::new(monitor, version));
-            }
-            Err(error) => {
-                warn!("Unable to add {} due to: {}", monitor.monitor_id(), error)
-            }
-        }
-    }
-
-    match list.is_empty() {
-        false => Ok(list),
-        true => Err(NoMonitors),
     }
 }
 
@@ -228,6 +172,62 @@ pub async fn monitor(
     }
 
     Ok(())
+}
+
+async fn create_monitor_list(
+    monitors: Vec<Box<dyn Monitor>>,
+    db: &DatabaseConnection,
+    global_configs: GlobalConfiguration,
+) -> Result<HashMap<String, ReleaseTracker>, Error> {
+    let mut list = HashMap::with_capacity(monitors.len());
+    let stored_versions: HashMap<String, String> = {
+        let selected = VersionEntity::find().all(db).await?;
+        debug!("selected: {:?}", selected);
+        selected
+            .into_iter()
+            .map(|x| (x.monitor_id, x.version))
+            .collect()
+    };
+
+    debug!("stored_versions from database: {:?}", stored_versions);
+
+    for mut monitor in monitors {
+        monitor.set_global_configs(&global_configs);
+
+        // Initial check of monitors
+        match monitor.check().await {
+            Ok(release_data) => {
+                let stored_version = stored_versions.get(&monitor.monitor_id());
+                let version = match stored_version {
+                    None => {
+                        debug!(
+                            "Initial check got {} for {}",
+                            release_data.version,
+                            monitor.monitor_id()
+                        );
+                        release_data.version
+                    }
+                    Some(stored_version) => {
+                        debug!(
+                            "Using stored version {} for {}",
+                            stored_version,
+                            monitor.monitor_id()
+                        );
+                        stored_version.to_string()
+                    }
+                };
+                list.insert(monitor.monitor_id(), ReleaseTracker::new(monitor, version));
+            }
+            Err(error) => {
+                warn!("Unable to add {} due to: {}", monitor.monitor_id(), error)
+            }
+        }
+    }
+
+    match list.is_empty() {
+        false => Ok(list),
+        true => Err(NoMonitors),
+    }
 }
 
 fn monitor_entity(monitor_id: &str, version: &str) -> VersionEntityActiveModel {

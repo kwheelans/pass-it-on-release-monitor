@@ -18,6 +18,10 @@ use tokio::sync::mpsc;
 use tracing::level_filters::LevelFilter;
 use tracing::log::debug;
 use tracing::{error, info};
+use tracing_subscriber::filter::Targets;
+use tracing_subscriber::fmt;
+use tracing_subscriber::layer::SubscriberExt;
+use tracing_subscriber::util::SubscriberInitExt;
 
 const SQLITE_MEMORY: &str = "sqlite::memory:";
 
@@ -30,7 +34,13 @@ async fn main() -> ExitCode {
     );
 
     // Configure logging
-    tracing_subscriber::fmt().with_max_level(verbosity).init();
+    let log_filter = Targets::default()
+        .with_target("pass_it_on_release_monitor", verbosity)
+        .with_default(LevelFilter::INFO);
+    tracing_subscriber::registry()
+        .with(fmt::layer())
+        .with(log_filter)
+        .init();
     info!("Verbosity set to {}", verbosity);
 
     match run(args).await {
