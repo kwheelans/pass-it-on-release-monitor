@@ -20,6 +20,7 @@ pub struct GithubConfiguration {
     pub period: FrequencyPeriod,
     #[serde(default)]
     pub github_personal_token: Option<String>,
+    pub github_personal_token_global: Option<String>,
 }
 
 #[async_trait]
@@ -58,8 +59,8 @@ impl Monitor for GithubConfiguration {
     }
 
     fn set_global_configs(&mut self, configs: &GlobalConfiguration) {
-        if self.github_personal_token.is_none() && configs.github_personal_token.is_some() {
-            self.github_personal_token = configs.github_personal_token.clone();
+        if  configs.github_personal_token.is_some() {
+            self.github_personal_token_global = configs.github_personal_token.clone();
         }
     }
 }
@@ -72,7 +73,7 @@ impl GithubConfiguration {
             self.owner.as_str()
         );
         let release = {
-            let instance = match &self.github_personal_token {
+            let instance = match self.get_github_personal_token() {
                 None => octocrab::OctocrabBuilder::default().build()?,
                 Some(token) => octocrab::OctocrabBuilder::default()
                     .personal_token(token.as_str())
@@ -95,5 +96,15 @@ impl GithubConfiguration {
             version: release.tag_name,
             link: Some(release.html_url.to_string()),
         })
+    }
+
+    fn get_github_personal_token(&self) -> Option<String> {
+        if self.github_personal_token.is_some() {
+            self.github_personal_token.clone()
+        } else if self.github_personal_token_global.is_some() {
+            self.github_personal_token_global.clone()
+        } else {
+            None
+        }
     }
 }
