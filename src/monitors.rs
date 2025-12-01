@@ -128,6 +128,36 @@ impl ReleaseTracker {
     }
 }
 
+async fn get_model_list(db: &DatabaseConnection) -> Result<HashMap<String, MonitorModel>, Error> {
+    let selected = select_all_monitors(db).await?;
+    Ok(selected.into_iter().map(|m| (m.name.clone(), m)).collect())
+}
+
+pub async fn monitoring(
+    db: &DatabaseConnection,
+    global_configs: GlobalConfiguration,
+    interface: mpsc::Sender<ClientReadyMessage>,
+) -> Result<(), Error> {
+    let conflict_id_update = OnConflict::column(monitors::Column::Id)
+        .update_column(monitors::Column::Version)
+        .to_owned();
+    debug!("Getting all models from database");
+    let monitor_models = get_model_list(db).await?;
+    if monitor_models.is_empty() {
+        warn!("No monitors present in database")
+    }
+
+    while !interface.is_closed() {
+        tokio::time::sleep(MONITOR_SLEEP_DURATION).await;
+        for (name, model) in &monitor_models {
+            //TODO: check all monitors
+        }
+
+    }
+
+    Ok(())
+}
+
 pub async fn monitor(
     monitors: Vec<Box<dyn Monitor>>,
     interface: mpsc::Sender<ClientReadyMessage>,
@@ -217,11 +247,6 @@ async fn create_monitor_list(
         debug!("selected: {:?}", selected);
         selected.into_iter().map(|x| (x.name, x.version)).collect()
     };
-
-    let selected = select_all_monitors(db).await?;
-    for s in selected {
-        let x = monitor_from_model(s)?;
-    }
 
     debug!("stored_versions from database: {:?}", stored_versions);
 
