@@ -1,10 +1,10 @@
 use crate::monitors::Monitor;
 use pass_it_on::ClientConfigFile;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 const DEFAULT_DATA_PATH: &str = "sqlite://release-monitor.sqlite";
 
-#[derive(Deserialize, Debug)]
+#[derive(Debug, Deserialize)]
 pub struct ReleaseMonitorConfiguration {
     #[serde(default)]
     pub global: GlobalConfiguration,
@@ -12,12 +12,12 @@ pub struct ReleaseMonitorConfiguration {
     pub client: ClientConfigFile,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct MonitorConfiguration {
     pub monitor: Vec<Box<dyn Monitor>>,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 #[serde(default)]
 pub struct GlobalConfiguration {
     pub persist: bool,

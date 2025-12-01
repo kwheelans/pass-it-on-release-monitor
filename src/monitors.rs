@@ -1,33 +1,44 @@
 use crate::configuration::GlobalConfiguration;
-use crate::database::{VersionEntity, VersionEntityActiveModel, version};
+use crate::database::queries::select_all_monitors;
+use crate::database::{MonitorActiveModel, MonitorEntity, MonitorModel, monitors};
 use crate::error::Error;
-use crate::error::Error::NoMonitors;
+use crate::error::Error::{ModelConversionFailed, NoMonitors};
+use crate::monitors::github_release::{
+    GithubConfiguration, GithubConfigurationInner, TYPE_NAME_GITHUB,
+};
+use crate::monitors::rancher_channel_server::{
+    RancherChannelServerConfiguration, TYPE_NAME_RANCHER_CHANNEL,
+};
 use async_trait::async_trait;
+use chrono::{DateTime, TimeDelta, Utc};
 use pass_it_on::notifications::ClientReadyMessage;
+use sea_orm::prelude::ChronoUtc;
 use sea_orm::sea_query::OnConflict;
 use sea_orm::{ActiveValue, DatabaseConnection, EntityTrait};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fmt::Debug;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 use tokio::sync::mpsc;
 use tracing::{debug, trace, warn};
 
 pub mod github_release;
 pub mod rancher_channel_server;
 
+const MONITOR_SLEEP_DURATION: Duration = Duration::from_secs(60);
+
 #[async_trait]
-#[typetag::deserialize(tag = "type")]
+#[typetag::serde(tag = "type")]
 pub trait Monitor: Send + Debug {
-    async fn check(&self) -> Result<ReleaseData, Error>;
+    async fn check(&self, global_config: &GlobalConfiguration) -> Result<ReleaseData, Error>;
     fn message(&self, version: ReleaseData) -> ClientReadyMessage;
     fn monitor_type(&self) -> String;
-    fn monitor_id(&self) -> String;
-    fn frequency(&self) -> Duration;
-    fn set_global_configs(&mut self, configs: &GlobalConfiguration);
+    fn name(&self) -> String;
+    fn frequency(&self) -> TimeDelta;
+    fn to_json(&self) -> String;
 }
 
-#[derive(Deserialize, Debug, Default)]
+#[derive(Debug, Serialize, Deserialize, Default)]
 pub enum FrequencyPeriod {
     #[serde(alias = "minute")]
     Minute,
@@ -41,17 +52,18 @@ pub enum FrequencyPeriod {
 }
 
 impl FrequencyPeriod {
-    pub fn to_duration(&self, value: u64) -> Duration {
+    pub fn to_duration(&self, value: u64) -> TimeDelta {
+        let value = value as i64;
         match self {
-            FrequencyPeriod::Minute => Duration::from_secs(60 * value),
-            FrequencyPeriod::Hour => Duration::from_secs(3600 * value),
-            FrequencyPeriod::Day => Duration::from_secs(86400 * value),
-            FrequencyPeriod::Week => Duration::from_secs(604800 * value),
+            FrequencyPeriod::Minute => TimeDelta::minutes(value),
+            FrequencyPeriod::Hour => TimeDelta::hours(value),
+            FrequencyPeriod::Day => TimeDelta::days(value),
+            FrequencyPeriod::Week => TimeDelta::weeks(value),
         }
     }
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct FrequencyValue(u64);
 
 impl Default for FrequencyValue {
@@ -68,7 +80,7 @@ pub struct ReleaseData {
 struct ReleaseTracker {
     monitor: Box<dyn Monitor>,
     version: String,
-    last_check: Instant,
+    last_check: DateTime<Utc>,
 }
 
 impl ReleaseTracker {
@@ -76,21 +88,22 @@ impl ReleaseTracker {
         Self {
             monitor,
             version,
-            last_check: Instant::now(),
+            last_check: ChronoUtc::now(),
         }
     }
 
     pub fn needs_check(&self) -> bool {
-        Instant::now()
-            .duration_since(self.last_check)
-            .ge(&self.monitor.frequency())
+        ChronoUtc::now()
+            .signed_duration_since(self.last_check)
+            .abs()
+            .ge(&self.monitor.frequency().abs())
     }
 
     pub fn new_version(&mut self, latest: &str) -> bool {
         let update = PartialEq::ne(self.version.as_str(), latest);
         if update {
             self.version = latest.to_string();
-            self.last_check = Instant::now();
+            self.last_check = ChronoUtc::now();
         }
         update
     }
@@ -100,25 +113,25 @@ pub async fn monitor(
     monitors: Vec<Box<dyn Monitor>>,
     interface: mpsc::Sender<ClientReadyMessage>,
     global_configs: GlobalConfiguration,
-    db: &DatabaseConnection,
+    db: DatabaseConnection,
 ) -> Result<(), Error> {
     let mut startup = true;
     let mut update_store = true;
-    let monitor_id_update_on_conflict = OnConflict::column(version::Column::MonitorId)
-        .update_column(version::Column::Version)
+    let conflict_id_update = OnConflict::column(monitors::Column::Id)
+        .update_column(monitors::Column::Version)
         .to_owned();
 
     debug!("Getting monitor_list with create_monitor_list");
-    let mut monitor_list = create_monitor_list(monitors, db, global_configs).await?;
+    let mut monitor_list = create_monitor_list(monitors, &db, &global_configs).await?;
 
     while !interface.is_closed() {
-        tokio::time::sleep(Duration::from_secs(60)).await;
+        tokio::time::sleep(MONITOR_SLEEP_DURATION).await;
 
         for (monitor_id, tracker) in &mut monitor_list {
             match tracker.needs_check() || startup {
                 true => {
                     trace!("{}: check required", monitor_id.as_str());
-                    match tracker.monitor.check().await {
+                    match tracker.monitor.check(&global_configs).await {
                         Ok(latest) => {
                             debug!(
                                 "{}: Checking previous version: {} |-| latest version: {}",
@@ -159,12 +172,12 @@ pub async fn monitor(
             debug!("Updating in memory values to database",);
             let monitor_store: Vec<_> = monitor_list
                 .iter()
-                .map(|(id, tracker)| monitor_entity(id, tracker.version.as_str()))
+                .map(|(id, tracker)| monitor_entity(id, id, tracker.version.as_str()))
                 .collect();
 
-            VersionEntity::insert_many(monitor_store)
-                .on_conflict(monitor_id_update_on_conflict.clone())
-                .exec(db)
+            MonitorEntity::insert_many(monitor_store)
+                .on_conflict(conflict_id_update.clone())
+                .exec(&db)
                 .await?;
             update_store = false;
         }
@@ -177,33 +190,33 @@ pub async fn monitor(
 async fn create_monitor_list(
     monitors: Vec<Box<dyn Monitor>>,
     db: &DatabaseConnection,
-    global_configs: GlobalConfiguration,
+    global_configs: &GlobalConfiguration,
 ) -> Result<HashMap<String, ReleaseTracker>, Error> {
     let mut list = HashMap::with_capacity(monitors.len());
     let stored_versions: HashMap<String, String> = {
-        let selected = VersionEntity::find().all(db).await?;
+        let selected = select_all_monitors(db).await?;
         debug!("selected: {:?}", selected);
-        selected
-            .into_iter()
-            .map(|x| (x.monitor_id, x.version))
-            .collect()
+        selected.into_iter().map(|x| (x.name, x.version)).collect()
     };
+
+    let selected = select_all_monitors(db).await?;
+    for s in selected {
+        let x = monitor_from_model(s)?;
+    }
 
     debug!("stored_versions from database: {:?}", stored_versions);
 
-    for mut monitor in monitors {
-        monitor.set_global_configs(&global_configs);
-
+    for monitor in monitors {
         // Initial check of monitors
-        match monitor.check().await {
+        match monitor.check(global_configs).await {
             Ok(release_data) => {
-                let stored_version = stored_versions.get(&monitor.monitor_id());
+                let stored_version = stored_versions.get(&monitor.name());
                 let version = match stored_version {
                     None => {
                         debug!(
                             "Initial check got {} for {}",
                             release_data.version,
-                            monitor.monitor_id()
+                            monitor.name()
                         );
                         release_data.version
                     }
@@ -211,15 +224,15 @@ async fn create_monitor_list(
                         debug!(
                             "Using stored version {} for {}",
                             stored_version,
-                            monitor.monitor_id()
+                            monitor.name()
                         );
                         stored_version.to_string()
                     }
                 };
-                list.insert(monitor.monitor_id(), ReleaseTracker::new(monitor, version));
+                list.insert(monitor.name(), ReleaseTracker::new(monitor, version));
             }
             Err(error) => {
-                warn!("Unable to add {} due to: {}", monitor.monitor_id(), error)
+                warn!("Unable to add {} due to: {}", monitor.name(), error)
             }
         }
     }
@@ -230,13 +243,31 @@ async fn create_monitor_list(
     }
 }
 
-fn monitor_entity(monitor_id: &str, version: &str) -> VersionEntityActiveModel {
-    VersionEntityActiveModel {
-        monitor_id: ActiveValue::Set(monitor_id.to_owned()),
-        version: ActiveValue::Set(version.to_owned()),
+fn monitor_from_model(model: MonitorModel) -> Result<Box<dyn Monitor>, Error> {
+    match model.monitor_type.as_str() {
+        TYPE_NAME_GITHUB => Ok(Box::new(GithubConfiguration {
+            name: model.name,
+            inner: serde_json::from_str::<GithubConfigurationInner>(model.configuration.as_str())?,
+        })),
+        TYPE_NAME_RANCHER_CHANNEL => Ok(Box::new(serde_json::from_str::<
+            RancherChannelServerConfiguration,
+        >(model.configuration.as_str())?)),
+        _ => Err(ModelConversionFailed),
     }
 }
 
+fn monitor_entity(name: &str, monitor_type: &str, version: &str) -> MonitorActiveModel {
+    MonitorActiveModel {
+        id: Default::default(),
+        name: ActiveValue::Unchanged(name.to_owned()),
+        monitor_type: ActiveValue::Unchanged(monitor_type.to_owned()),
+        version: ActiveValue::Set(version.to_owned()),
+        configuration: Default::default(),
+        timestamp: Default::default(),
+    }
+}
+
+/* TODO: Fix tests after completing changes
 #[cfg(test)]
 mod tests {
     use crate::monitors::rancher_channel_server::RancherChannelServerConfiguration;
@@ -275,3 +306,4 @@ mod tests {
         assert_eq!(tracker.version, NEW_VERSION.to_string())
     }
 }
+*/

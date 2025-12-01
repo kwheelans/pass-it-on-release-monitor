@@ -15,6 +15,10 @@ pub enum Error {
     #[error("No valid configured monitors")]
     NoMonitors,
 
+    /// Cannot create a Monitor from the entity Model data
+    #[error("Unable to create known Monitor type from Model")]
+    ModelConversionFailed,
+
     // ### Converting from other error types ###
     /// Pass-thru [`std::io::Error`].
     #[error("std::io Error: {0}")]

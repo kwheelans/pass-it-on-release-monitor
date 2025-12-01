@@ -1,4 +1,6 @@
-pub mod version;
+pub mod monitors;
+pub mod queries;
 
-pub use version::ActiveModel as VersionEntityActiveModel;
-pub use version::Entity as VersionEntity;
+pub use monitors::ActiveModel as MonitorActiveModel;
+pub use monitors::Entity as MonitorEntity;
+pub use monitors::Model as MonitorModel;
