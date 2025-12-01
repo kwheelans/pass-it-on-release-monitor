@@ -1,12 +1,12 @@
-mod index_page;
-mod handlers;
 mod common_page;
+mod handlers;
+mod index_page;
 
+use crate::webpage::handlers::get_ui_index;
 use axum::routing::get;
 use axum::{Router, serve};
 use sea_orm::DatabaseConnection;
 use tokio::net::TcpListener;
-use crate::webpage::handlers::get_ui_index;
 
 #[derive(Debug, Clone)]
 pub(super) struct AppState {
@@ -44,13 +44,9 @@ impl AppState {
     }
 }
 
-
-
 pub async fn serve_web_ui(state: AppState, listener: TcpListener) {
     let routes = Router::new()
         .route("/", get(get_ui_index))
         .with_state(state);
-    serve(listener, routes)
-        .await
-        .expect("axum serve error")
+    serve(listener, routes).await.expect("axum serve error")
 }

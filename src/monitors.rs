@@ -29,7 +29,7 @@ const MONITOR_SLEEP_DURATION: Duration = Duration::from_secs(60);
 
 #[async_trait]
 #[typetag::serde(tag = "type")]
-pub trait Monitor: Send + Debug {
+pub trait Monitor: CloneMonitor + Send + Debug {
     async fn check(&self, global_config: &GlobalConfiguration) -> Result<ReleaseData, Error>;
     fn message(&self, version: ReleaseData) -> ClientReadyMessage;
     fn monitor_type(&self) -> String;
@@ -38,7 +38,26 @@ pub trait Monitor: Send + Debug {
     fn to_json(&self) -> String;
 }
 
-#[derive(Debug, Serialize, Deserialize, Default)]
+pub trait CloneMonitor {
+    fn box_clone(&self) -> Box<dyn Monitor>;
+}
+
+impl<T> CloneMonitor for T
+where
+    T: Monitor + Clone + 'static,
+{
+    fn box_clone(&self) -> Box<dyn Monitor> {
+        Box::new(self.clone())
+    }
+}
+
+impl Clone for Box<dyn Monitor> {
+    fn clone(&self) -> Self {
+        self.box_clone()
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub enum FrequencyPeriod {
     #[serde(alias = "minute")]
     Minute,
@@ -63,7 +82,7 @@ impl FrequencyPeriod {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct FrequencyValue(u64);
 
 impl Default for FrequencyValue {

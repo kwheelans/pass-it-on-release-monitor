@@ -2,22 +2,21 @@ use crate::configuration::GlobalConfiguration;
 use crate::error::Error;
 use crate::monitors::{FrequencyPeriod, FrequencyValue, Monitor, ReleaseData};
 use async_trait::async_trait;
+use chrono::TimeDelta;
 use pass_it_on::notifications::{ClientReadyMessage, Message};
 use serde::{Deserialize, Serialize};
-use chrono::TimeDelta;
 use tracing::trace;
 
 pub const TYPE_NAME_RANCHER_CHANNEL: &str = "rancher-channel";
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RancherChannelServerConfiguration {
     pub name: String,
     #[serde(flatten)]
     pub inner: RancherChannelServerConfigurationInner,
-
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RancherChannelServerConfigurationInner {
     pub url: String,
     pub channel: String,

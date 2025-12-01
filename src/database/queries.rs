@@ -1,10 +1,10 @@
-use sea_orm::{DatabaseConnection, DbErr, EntityTrait, Iden, Set};
+use crate::database::{MonitorActiveModel, MonitorEntity, MonitorModel, monitors};
+use crate::monitors::Monitor;
 use sea_orm::prelude::DateTimeUtc;
 use sea_orm::sea_query::OnConflict;
+use sea_orm::{DatabaseConnection, DbErr, EntityTrait, Iden, Set};
 use tracing::debug;
 use tracing::log::warn;
-use crate::database::{monitors, MonitorEntity, MonitorActiveModel, MonitorModel};
-use crate::monitors::Monitor;
 
 pub async fn select_all_monitors(db: &DatabaseConnection) -> Result<Vec<MonitorModel>, DbErr> {
     let records: Vec<MonitorModel> = MonitorEntity::find().all(db).await?;

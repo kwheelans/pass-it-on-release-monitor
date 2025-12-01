@@ -1,8 +1,8 @@
+use crate::webpage::AppState;
+use crate::webpage::index_page::index_page;
 use axum::extract::State;
 use axum::http::StatusCode;
 use maud::Markup;
-use crate::webpage::AppState;
-use crate::webpage::index_page::index_page;
 
 const INDEX_PAGE_TITLE: &str = "Release Monitor";
 

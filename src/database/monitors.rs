@@ -11,7 +11,7 @@ pub struct Model {
     pub monitor_type: String,
     pub configuration: String,
     pub version: String,
-    pub timestamp: ChronoUnixTimestamp
+    pub timestamp: ChronoUnixTimestamp,
 }
 
 impl ActiveModelBehavior for ActiveModel {}

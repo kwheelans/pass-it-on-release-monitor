@@ -7,8 +7,11 @@ mod webpage;
 
 use crate::cli::CliArgs;
 use crate::configuration::ReleaseMonitorConfiguration;
+use crate::database::MonitorEntity;
+use crate::database::queries::insert_monitor;
 use crate::error::Error;
 use crate::monitors::monitor;
+use crate::webpage::{AppState, serve_web_ui};
 use clap::Parser;
 use pass_it_on::start_client;
 use sea_orm::Database;
@@ -22,9 +25,6 @@ use tracing_subscriber::filter::Targets;
 use tracing_subscriber::fmt;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
-use crate::database::MonitorEntity;
-use crate::database::queries::insert_monitor;
-use crate::webpage::{serve_web_ui, AppState};
 
 const SQLITE_MEMORY: &str = "sqlite::memory:";
 
@@ -85,14 +85,13 @@ async fn run(args: CliArgs) -> Result<(), Error> {
     // Initialize state & listener for Axum
     let state = AppState::new(db, None, None);
     let listener = tokio::net::TcpListener::bind("127.0.0.1:8080").await?;
-    let db =  state.db().clone();
+    let db = state.db().clone();
 
-    //TODO: Insert initial monitors from configuration, initialize timestamp to DateTime::MIN
-    for m in config.monitors.monitor  {
-        insert_monitor(&db, m).await?
+    // Insert initial monitors from configuration if they do not exist
+    for monitor in &config.monitors.monitor {
+        insert_monitor(&db, monitor.clone()).await?
     }
-    
-/*
+
     // Start monitor task
     tokio::spawn(async move {
         monitor(
@@ -103,13 +102,9 @@ async fn run(args: CliArgs) -> Result<(), Error> {
         )
         .await
     });
-    
- */
-    
+
     // Start Web UI
-    tokio::spawn(async move {
-        serve_web_ui(state, listener).await
-    });
+    tokio::spawn(async move { serve_web_ui(state, listener).await });
 
     // Start Pass-It-On client
     start_client(config.client.try_into()?, interface_rx, None, None).await?;

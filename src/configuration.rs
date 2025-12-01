@@ -12,7 +12,7 @@ pub struct ReleaseMonitorConfiguration {
     pub client: ClientConfigFile,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MonitorConfiguration {
     pub monitor: Vec<Box<dyn Monitor>>,
 }

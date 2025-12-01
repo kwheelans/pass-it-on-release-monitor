@@ -2,21 +2,21 @@ use crate::configuration::GlobalConfiguration;
 use crate::error::Error;
 use crate::monitors::{FrequencyPeriod, FrequencyValue, Monitor, ReleaseData};
 use async_trait::async_trait;
+use chrono::TimeDelta;
 use pass_it_on::notifications::{ClientReadyMessage, Message};
 use serde::{Deserialize, Serialize};
-use chrono::TimeDelta;
 use tracing::trace;
 
 pub const TYPE_NAME_GITHUB: &str = "github";
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GithubConfiguration {
     pub name: String,
     #[serde(flatten)]
     pub inner: GithubConfigurationInner,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GithubConfigurationInner {
     pub owner: String,
     pub repo: String,
@@ -65,7 +65,10 @@ impl Monitor for GithubConfiguration {
 }
 
 impl GithubConfiguration {
-    async fn get_latest_release(&self, global_config: &GlobalConfiguration) -> Result<ReleaseData, Error> {
+    async fn get_latest_release(
+        &self,
+        global_config: &GlobalConfiguration,
+    ) -> Result<ReleaseData, Error> {
         trace!(
             "Checking Github latest release for repository {}/{}",
             self.inner.repo.as_str(),
