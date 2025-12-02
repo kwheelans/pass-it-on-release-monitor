@@ -2,7 +2,7 @@ use crate::database::{MonitorActiveModel, MonitorEntity, MonitorModel, monitors}
 use crate::monitors::Monitor;
 use sea_orm::prelude::DateTimeUtc;
 use sea_orm::sea_query::OnConflict;
-use sea_orm::{DatabaseConnection, DbErr, EntityTrait, Iden, Set};
+use sea_orm::{ActiveModelTrait, DatabaseConnection, DbErr, EntityTrait, Set};
 use tracing::debug;
 use tracing::log::warn;
 
@@ -33,7 +33,7 @@ pub async fn insert_monitor(
         id: Default::default(),
         name: Set(monitor.name()),
         monitor_type: Set(monitor.monitor_type()),
-        configuration: Set(monitor.to_json()),
+        configuration: Set(monitor.inner_to_json()),
         version: Set("".to_string()),
         timestamp: Set(DateTimeUtc::default().into()),
     };
@@ -55,4 +55,12 @@ fn insert_result<T>(result: Result<T, DbErr>) -> Result<(), DbErr> {
         }
         Err(e) => Err(e),
     }
+}
+
+pub async fn update_monitor(
+    db: &DatabaseConnection,
+    model: MonitorActiveModel,
+) -> Result<(), DbErr> {
+    model.update(db).await?;
+    Ok(())
 }

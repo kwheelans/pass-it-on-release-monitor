@@ -88,7 +88,7 @@ impl Monitor for RancherChannelServerConfiguration {
         self.inner.period.to_duration(self.inner.frequency.0)
     }
 
-    fn to_json(&self) -> String {
+    fn inner_to_json(&self) -> String {
         serde_json::to_string(&self.inner).expect("monitor to_json failed")
     }
 }

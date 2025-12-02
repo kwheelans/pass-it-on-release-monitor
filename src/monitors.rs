@@ -1,26 +1,26 @@
 use crate::configuration::GlobalConfiguration;
-use crate::database::queries::select_all_monitors;
-use crate::database::{MonitorActiveModel, MonitorEntity, MonitorModel, monitors};
+use crate::database::MonitorModel;
+use crate::database::queries::{select_all_monitors, update_monitor};
 use crate::error::Error;
-use crate::error::Error::{ModelConversionFailed, NoMonitors};
+use crate::error::Error::ModelConversionFailed;
 use crate::monitors::github_release::{
     GithubConfiguration, GithubConfigurationInner, TYPE_NAME_GITHUB,
 };
 use crate::monitors::rancher_channel_server::{
-    RancherChannelServerConfiguration, TYPE_NAME_RANCHER_CHANNEL,
+    RancherChannelServerConfiguration, RancherChannelServerConfigurationInner,
+    TYPE_NAME_RANCHER_CHANNEL,
 };
 use async_trait::async_trait;
-use chrono::{DateTime, TimeDelta, Utc};
+use chrono::TimeDelta;
 use pass_it_on::notifications::ClientReadyMessage;
 use sea_orm::prelude::ChronoUtc;
-use sea_orm::sea_query::OnConflict;
-use sea_orm::{ActiveValue, DatabaseConnection, EntityTrait};
+use sea_orm::{DatabaseConnection, IntoActiveModel, Set};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fmt::Debug;
 use std::time::Duration;
 use tokio::sync::mpsc;
-use tracing::{debug, trace, warn};
+use tracing::{debug, error, trace, warn};
 
 pub mod github_release;
 pub mod rancher_channel_server;
@@ -35,7 +35,7 @@ pub trait Monitor: CloneMonitor + Send + Debug {
     fn monitor_type(&self) -> String;
     fn name(&self) -> String;
     fn frequency(&self) -> TimeDelta;
-    fn to_json(&self) -> String;
+    fn inner_to_json(&self) -> String;
 }
 
 pub trait CloneMonitor {
@@ -96,218 +96,91 @@ pub struct ReleaseData {
     pub link: Option<String>,
 }
 
-struct ReleaseTracker {
-    monitor: Box<dyn Monitor>,
-    version: String,
-    last_check: DateTime<Utc>,
-}
-
-impl ReleaseTracker {
-    pub fn new(monitor: Box<dyn Monitor>, version: String) -> Self {
-        Self {
-            monitor,
-            version,
-            last_check: ChronoUtc::now(),
-        }
-    }
-
-    pub fn needs_check(&self) -> bool {
-        ChronoUtc::now()
-            .signed_duration_since(self.last_check)
-            .abs()
-            .ge(&self.monitor.frequency().abs())
-    }
-
-    pub fn new_version(&mut self, latest: &str) -> bool {
-        let update = PartialEq::ne(self.version.as_str(), latest);
-        if update {
-            self.version = latest.to_string();
-            self.last_check = ChronoUtc::now();
-        }
-        update
-    }
-}
-
 async fn get_model_list(db: &DatabaseConnection) -> Result<HashMap<String, MonitorModel>, Error> {
     let selected = select_all_monitors(db).await?;
     Ok(selected.into_iter().map(|m| (m.name.clone(), m)).collect())
 }
 
-pub async fn monitoring(
+pub async fn start_monitoring(
     db: &DatabaseConnection,
     global_configs: GlobalConfiguration,
     interface: mpsc::Sender<ClientReadyMessage>,
 ) -> Result<(), Error> {
-    let conflict_id_update = OnConflict::column(monitors::Column::Id)
-        .update_column(monitors::Column::Version)
-        .to_owned();
-    debug!("Getting all models from database");
-    let monitor_models = get_model_list(db).await?;
-    if monitor_models.is_empty() {
-        warn!("No monitors present in database")
-    }
-
     while !interface.is_closed() {
-        tokio::time::sleep(MONITOR_SLEEP_DURATION).await;
+        debug!("Getting all models from database");
+        let monitor_models = get_model_list(db).await?;
+        if monitor_models.is_empty() {
+            warn!("No monitors present in database")
+        }
+
         for (name, model) in &monitor_models {
-            //TODO: check all monitors
-        }
-
-    }
-
-    Ok(())
-}
-
-pub async fn monitor(
-    monitors: Vec<Box<dyn Monitor>>,
-    interface: mpsc::Sender<ClientReadyMessage>,
-    global_configs: GlobalConfiguration,
-    db: DatabaseConnection,
-) -> Result<(), Error> {
-    let mut startup = true;
-    let mut update_store = true;
-    let conflict_id_update = OnConflict::column(monitors::Column::Id)
-        .update_column(monitors::Column::Version)
-        .to_owned();
-
-    debug!("Getting monitor_list with create_monitor_list");
-    let mut monitor_list = create_monitor_list(monitors, &db, &global_configs).await?;
-
-    while !interface.is_closed() {
-        tokio::time::sleep(MONITOR_SLEEP_DURATION).await;
-
-        for (monitor_id, tracker) in &mut monitor_list {
-            match tracker.needs_check() || startup {
-                true => {
-                    trace!("{}: check required", monitor_id.as_str());
-                    match tracker.monitor.check(&global_configs).await {
-                        Ok(latest) => {
-                            debug!(
-                                "{}: Checking previous version: {} |-| latest version: {}",
-                                monitor_id.as_str(),
-                                tracker.version.as_str(),
-                                latest.version.as_str()
-                            );
-                            match tracker.new_version(latest.version.as_str()) {
-                                true => {
-                                    update_store = true;
-                                    debug!("{}: Sending notification", monitor_id.as_str());
-                                    if let Err(error) =
-                                        interface.send(tracker.monitor.message(latest)).await
-                                    {
-                                        warn!(
-                                            "{}: Error sending notification -> {}",
-                                            monitor_id.as_str(),
-                                            error
-                                        )
-                                    }
+            let monitor = monitor_from_model(model)?;
+            if needs_check(model, monitor.as_ref()) {
+                trace!("Monitor needs to be checked: {}", name);
+                match monitor.check(&global_configs).await {
+                    Ok(release_data) => {
+                        debug!("{:?}", model);
+                        debug!(
+                            "Checked version for: {} --> old: {} |-| new: {}",
+                            name,
+                            model.version.as_str(),
+                            release_data.version.as_str()
+                        );
+                        if is_new_version(model.version.as_str(), release_data.version.as_str()) {
+                            trace!("Found new version: {}", name);
+                            let mut active_model = model.clone().into_active_model();
+                            active_model.version = Set(release_data.version.clone());
+                            active_model.timestamp = Set(ChronoUtc::now().into());
+                            if let Err(error) = update_monitor(db, active_model).await {
+                                error!("Database Update failed for: {} --> {}", name, error);
+                            } else {
+                                debug!("Sending notification: {}", name);
+                                if let Err(error) =
+                                    interface.send(monitor.message(release_data)).await
+                                {
+                                    warn!("Error sending notification: {} -> {}", name, error)
                                 }
-                                false => trace!(
-                                    "{}: Both previous and latest version are equal",
-                                    monitor_id.as_str()
-                                ),
                             }
+                        } else {
+                            trace!("Both old and new version are equal: {}", name);
                         }
-                        Err(error) => {
-                            warn!("{}: Unable to check -> {}", monitor_id.as_str(), error)
-                        }
-                    };
+                    }
+                    Err(error) => {
+                        warn!("Unable to check: {} --> {}", name, error)
+                    }
                 }
-                false => trace!("{}: check not required", monitor_id.as_str()),
+            } else {
+                trace!("Monitor does not need to be checked: {}", name)
             }
         }
-
-        if update_store || startup {
-            debug!("Updating in memory values to database",);
-            let monitor_store: Vec<_> = monitor_list
-                .iter()
-                .map(|(id, tracker)| monitor_entity(id, id, tracker.version.as_str()))
-                .collect();
-
-            MonitorEntity::insert_many(monitor_store)
-                .on_conflict(conflict_id_update.clone())
-                .exec(&db)
-                .await?;
-            update_store = false;
-        }
-        startup = false;
+        // Wait before starting to check again
+        tokio::time::sleep(MONITOR_SLEEP_DURATION).await;
     }
-
     Ok(())
 }
 
-async fn create_monitor_list(
-    monitors: Vec<Box<dyn Monitor>>,
-    db: &DatabaseConnection,
-    global_configs: &GlobalConfiguration,
-) -> Result<HashMap<String, ReleaseTracker>, Error> {
-    let mut list = HashMap::with_capacity(monitors.len());
-    let stored_versions: HashMap<String, String> = {
-        let selected = select_all_monitors(db).await?;
-        debug!("selected: {:?}", selected);
-        selected.into_iter().map(|x| (x.name, x.version)).collect()
-    };
-
-    debug!("stored_versions from database: {:?}", stored_versions);
-
-    for monitor in monitors {
-        // Initial check of monitors
-        match monitor.check(global_configs).await {
-            Ok(release_data) => {
-                let stored_version = stored_versions.get(&monitor.name());
-                let version = match stored_version {
-                    None => {
-                        debug!(
-                            "Initial check got {} for {}",
-                            release_data.version,
-                            monitor.name()
-                        );
-                        release_data.version
-                    }
-                    Some(stored_version) => {
-                        debug!(
-                            "Using stored version {} for {}",
-                            stored_version,
-                            monitor.name()
-                        );
-                        stored_version.to_string()
-                    }
-                };
-                list.insert(monitor.name(), ReleaseTracker::new(monitor, version));
-            }
-            Err(error) => {
-                warn!("Unable to add {} due to: {}", monitor.name(), error)
-            }
-        }
-    }
-
-    match list.is_empty() {
-        false => Ok(list),
-        true => Err(NoMonitors),
-    }
+fn needs_check(model: &MonitorModel, monitor: &dyn Monitor) -> bool {
+    let since_last_check = ChronoUtc::now().signed_duration_since(model.timestamp.to_utc());
+    since_last_check.ge(&monitor.frequency())
 }
 
-fn monitor_from_model(model: MonitorModel) -> Result<Box<dyn Monitor>, Error> {
+fn is_new_version<S: AsRef<str>>(old: S, new: S) -> bool {
+    PartialEq::ne(old.as_ref(), new.as_ref())
+}
+
+fn monitor_from_model(model: &MonitorModel) -> Result<Box<dyn Monitor>, Error> {
     match model.monitor_type.as_str() {
         TYPE_NAME_GITHUB => Ok(Box::new(GithubConfiguration {
-            name: model.name,
+            name: model.name.clone(),
             inner: serde_json::from_str::<GithubConfigurationInner>(model.configuration.as_str())?,
         })),
-        TYPE_NAME_RANCHER_CHANNEL => Ok(Box::new(serde_json::from_str::<
-            RancherChannelServerConfiguration,
-        >(model.configuration.as_str())?)),
+        TYPE_NAME_RANCHER_CHANNEL => Ok(Box::new(RancherChannelServerConfiguration {
+            name: model.name.clone(),
+            inner: serde_json::from_str::<RancherChannelServerConfigurationInner>(
+                model.configuration.as_str(),
+            )?,
+        })),
         _ => Err(ModelConversionFailed),
-    }
-}
-
-fn monitor_entity(name: &str, monitor_type: &str, version: &str) -> MonitorActiveModel {
-    MonitorActiveModel {
-        id: Default::default(),
-        name: ActiveValue::Unchanged(name.to_owned()),
-        monitor_type: ActiveValue::Unchanged(monitor_type.to_owned()),
-        version: ActiveValue::Set(version.to_owned()),
-        configuration: Default::default(),
-        timestamp: Default::default(),
     }
 }
 

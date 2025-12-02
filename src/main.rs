@@ -10,7 +10,7 @@ use crate::configuration::ReleaseMonitorConfiguration;
 use crate::database::MonitorEntity;
 use crate::database::queries::insert_monitor;
 use crate::error::Error;
-use crate::monitors::monitor;
+use crate::monitors::start_monitoring;
 use crate::webpage::{AppState, serve_web_ui};
 use clap::Parser;
 use pass_it_on::start_client;
@@ -93,15 +93,7 @@ async fn run(args: CliArgs) -> Result<(), Error> {
     }
 
     // Start monitor task
-    tokio::spawn(async move {
-        monitor(
-            config.monitors.monitor,
-            interface_tx.clone(),
-            config.global,
-            db,
-        )
-        .await
-    });
+    tokio::spawn(async move { start_monitoring(&db, config.global, interface_tx.clone()).await });
 
     // Start Web UI
     tokio::spawn(async move { serve_web_ui(state, listener).await });
