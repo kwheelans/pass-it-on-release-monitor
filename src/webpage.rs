@@ -48,5 +48,6 @@ pub async fn serve_web_ui(state: AppState, listener: TcpListener) {
     let routes = Router::new()
         .route("/", get(get_ui_index))
         .with_state(state);
+
     serve(listener, routes).await.expect("axum serve error")
 }

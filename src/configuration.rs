@@ -22,6 +22,8 @@ pub struct MonitorConfiguration {
 pub struct GlobalConfiguration {
     pub persist: bool,
     pub uri: String,
+    pub web_ui_port: u16,
+    pub web_ui_address: String,
     pub github_personal_token: Option<String>,
 }
 
@@ -30,6 +32,8 @@ impl Default for GlobalConfiguration {
         Self {
             persist: true,
             uri: DEFAULT_DATA_PATH.to_string(),
+            web_ui_port: 8080,
+            web_ui_address: "0.0.0.0".to_string(),
             github_personal_token: None,
         }
     }

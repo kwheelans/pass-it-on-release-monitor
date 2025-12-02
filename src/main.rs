@@ -79,18 +79,23 @@ async fn run(args: CliArgs) -> Result<(), Error> {
         .sync(&db)
         .await?;
 
-    // Setup channel
-    let (interface_tx, interface_rx) = mpsc::channel(100);
-
     // Initialize state & listener for Axum
     let state = AppState::new(db, None, None);
-    let listener = tokio::net::TcpListener::bind("127.0.0.1:8080").await?;
+    let listener = tokio::net::TcpListener::bind(format!(
+        "{}:{}",
+        config.global.web_ui_address, config.global.web_ui_port
+    ))
+    .await?;
     let db = state.db().clone();
+    info!("Listening on: {}", listener.local_addr()?);
 
     // Insert initial monitors from configuration if they do not exist
     for monitor in &config.monitors.monitor {
         insert_monitor(&db, monitor.clone()).await?
     }
+
+    // Setup message channel
+    let (interface_tx, interface_rx) = mpsc::channel(100);
 
     // Start monitor task
     tokio::spawn(async move { start_monitoring(&db, config.global, interface_tx.clone()).await });
