@@ -8,7 +8,7 @@ mod ui;
 use crate::cli::CliArgs;
 use crate::configuration::ReleaseMonitorConfiguration;
 use crate::database::MonitorEntity;
-use crate::database::queries::insert_monitor;
+use crate::database::queries::add_static_monitor;
 use crate::error::Error;
 use crate::monitors::start_monitoring;
 use crate::ui::handlers::{AppState, serve_web_ui};
@@ -91,7 +91,7 @@ async fn run(args: CliArgs) -> Result<(), Error> {
 
     // Insert initial monitors from configuration if they do not exist
     for monitor in &config.monitors.monitor {
-        insert_monitor(&db, monitor.clone()).await?
+        add_static_monitor(&db, monitor.clone()).await?
     }
 
     // Setup message channel

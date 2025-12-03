@@ -22,17 +22,29 @@ pub async fn select_one_monitor(
     Ok(record)
 }
 
-pub async fn insert_monitor(
+pub async fn add_monitor(db: &DatabaseConnection, monitor: Box<dyn Monitor>) -> Result<(), DbErr> {
+    let conflict = OnConflict::column(monitors::Column::Name)
+        .do_nothing()
+        .to_owned();
+    insert_monitor(db, monitor, conflict).await
+}
+
+pub async fn add_static_monitor(
     db: &DatabaseConnection,
     monitor: Box<dyn Monitor>,
 ) -> Result<(), DbErr> {
-    let conflict_id = OnConflict::column(monitors::Column::Id)
-        .do_nothing()
-        .to_owned();
-    let conflict_name = OnConflict::column(monitors::Column::Name)
+    let conflict = OnConflict::column(monitors::Column::Name)
         .action_and_where(Expr::col(monitors::Column::MonitorType).is(monitor.monitor_type()))
         .update_column(monitors::Column::Configuration)
         .to_owned();
+    insert_monitor(db, monitor, conflict).await
+}
+
+async fn insert_monitor(
+    db: &DatabaseConnection,
+    monitor: Box<dyn Monitor>,
+    on_conflict: OnConflict,
+) -> Result<(), DbErr> {
     let monitor = MonitorActiveModel {
         id: Default::default(),
         name: Set(monitor.name()),
@@ -42,8 +54,7 @@ pub async fn insert_monitor(
         timestamp: Set(DateTimeUtc::default().into()),
     };
     let result = MonitorEntity::insert(monitor)
-        .on_conflict(conflict_id)
-        .on_conflict(conflict_name)
+        .on_conflict(on_conflict)
         .exec(db)
         .await;
     debug!("Insert Result: {:?}", result);
