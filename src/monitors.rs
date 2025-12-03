@@ -142,11 +142,15 @@ pub async fn start_monitoring(
                             model.version.as_str(),
                             release_data.version.as_str()
                         );
+
+                        // Get active model and always update last checked timestamp
+                        let mut active_model = model.clone().into_active_model();
+                        active_model.timestamp = Set(ChronoUtc::now().into());
+
                         if is_new_version(model.version.as_str(), release_data.version.as_str()) {
                             trace!("Found new version: {}", name);
-                            let mut active_model = model.clone().into_active_model();
                             active_model.version = Set(release_data.version.clone());
-                            active_model.timestamp = Set(ChronoUtc::now().into());
+
                             if let Err(error) = update_monitor(db, active_model).await {
                                 error!("Database Update failed for: {} --> {}", name, error);
                             } else {
@@ -159,6 +163,9 @@ pub async fn start_monitoring(
                             }
                         } else {
                             trace!("Both old and new version are equal: {}", name);
+                            if let Err(error) = update_monitor(db, active_model).await {
+                                error!("Database Update failed for: {} --> {}", name, error);
+                            }
                         }
                     }
                     Err(error) => {

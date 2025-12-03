@@ -1,28 +1,27 @@
-use crate::AppState;
-use crate::database::queries::select_all_monitors;
+use crate::database::MonitorModel;
 use crate::monitors::github_release::TYPE_NAME_GITHUB;
 use crate::monitors::rancher_channel_server::TYPE_NAME_RANCHER_CHANNEL;
 use crate::ui::pages::{base, title};
-use axum::extract::State;
 use maud::{Markup, html};
+use sea_orm::prelude::ChronoUtc;
 use tracing::log::debug;
 
-pub async fn index_page(state: State<AppState>, page_title: &str, id: Option<i64>) -> Markup {
+const DATE_FORMAT: &str = "%Y-%m-%d %H:%M:%S %Z";
+
+pub async fn index_page(page_title: &str, records: Vec<MonitorModel>, id: Option<i64>) -> Markup {
     html! {
         (base().await)
         body {
             (title(page_title).await)
             main {
-                (list_records(state, id).await)
+                (list_records(records, id).await)
             }
         }
     }
 }
 
-async fn list_records(state: State<AppState>, id: Option<i64>) -> Markup {
-    let records = select_all_monitors(state.db())
-        .await
-        .expect("unable to select");
+async fn list_records(records: Vec<MonitorModel>, id: Option<i64>) -> Markup {
+    let now = ChronoUtc::now().format(DATE_FORMAT);
     let has_records = !records.is_empty();
     debug!("Index: {:?}", id);
     debug!("Has_records: {}", has_records);
@@ -45,7 +44,7 @@ async fn list_records(state: State<AppState>, id: Option<i64>) -> Markup {
                     }
                 }
             }
-
+            { "Current Time: " (now)}
             h2 { "Database Records" }
             @if has_records {
                 table {
@@ -54,7 +53,6 @@ async fn list_records(state: State<AppState>, id: Option<i64>) -> Markup {
                             th {"ID"}
                             th {"Name"}
                             th {"Type"}
-                            th {"Configuration"}
                             th {"Version"}
                             th {"Last Checked"}
                         }
@@ -63,7 +61,6 @@ async fn list_records(state: State<AppState>, id: Option<i64>) -> Markup {
                                 td { (record.id) }
                                 td { (record.name) }
                                 td { (record.monitor_type) }
-                                td { (record.configuration) }
                                 td { (record.version) }
                                 td { (record.timestamp.0) }
                             }
