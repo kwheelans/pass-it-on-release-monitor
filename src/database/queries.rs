@@ -2,7 +2,7 @@ use crate::database::{MonitorActiveModel, MonitorEntity, MonitorModel, monitors}
 use crate::monitors::Monitor;
 use sea_orm::prelude::DateTimeUtc;
 use sea_orm::sea_query::OnConflict;
-use sea_orm::{ActiveModelTrait, DatabaseConnection, DbErr, EntityTrait, Set};
+use sea_orm::{ActiveModelTrait, DatabaseConnection, DbErr, EntityTrait, ModelTrait, Set};
 use tracing::debug;
 use tracing::log::warn;
 
@@ -62,5 +62,15 @@ pub async fn update_monitor(
     model: MonitorActiveModel,
 ) -> Result<(), DbErr> {
     model.update(db).await?;
+    Ok(())
+}
+
+pub async fn delete_monitor(db: &DatabaseConnection, id: i64) -> Result<(), DbErr> {
+    let monitor = MonitorEntity::find_by_id(id)
+        .one(db)
+        .await?
+        .ok_or(DbErr::Custom("Cannot find record.".to_owned()))?;
+    let result = monitor.delete(db).await;
+    debug!("Delete Result: {:?}", result);
     Ok(())
 }

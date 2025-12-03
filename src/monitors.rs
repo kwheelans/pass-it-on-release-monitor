@@ -18,6 +18,7 @@ use sea_orm::{DatabaseConnection, IntoActiveModel, Set};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fmt::Debug;
+use std::num::ParseIntError;
 use std::time::Duration;
 use tokio::sync::mpsc;
 use tracing::{debug, error, trace, warn};
@@ -57,7 +58,7 @@ impl Clone for Box<dyn Monitor> {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Eq, PartialEq, Default, Serialize, Deserialize)]
 pub enum FrequencyPeriod {
     #[serde(alias = "minute")]
     Minute,
@@ -88,6 +89,20 @@ pub struct FrequencyValue(u64);
 impl Default for FrequencyValue {
     fn default() -> Self {
         Self(1)
+    }
+}
+
+impl TryFrom<&str> for FrequencyValue {
+    type Error = ParseIntError;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        Ok(Self(value.parse()?))
+    }
+}
+
+impl FrequencyValue {
+    pub fn inner(&self) -> u64 {
+        self.0
     }
 }
 

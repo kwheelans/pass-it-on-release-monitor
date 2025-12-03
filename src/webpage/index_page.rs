@@ -20,9 +20,8 @@ pub async fn index_page(state: State<AppState>, page_title: &str) -> Markup {
 }
 
 async fn list_records(state: State<AppState>) -> Markup {
-    let db = &state.db;
-    let id = &state.id;
-    let monitor_type = &state.monitor_type;
+    let db = state.db();
+    let id = state.id();
     let records = select_all_monitors(db).await.expect("unable to select");
     let has_records = !records.is_empty();
     debug!("Index: {:?}", id);
@@ -60,7 +59,7 @@ async fn list_records(state: State<AppState>) -> Markup {
                             th {"Last Checked"}
                         }
                         @for record in records {
-                            tr onclick={ "window.location='/" (record.monitor_type) "/" (record.id) "';" } {
+                            tr onclick={ "window.location='/" (record.id) "';" } {
                                 td { (record.id) }
                                 td { (record.name) }
                                 td { (record.monitor_type) }
@@ -74,9 +73,9 @@ async fn list_records(state: State<AppState>) -> Markup {
             } @else {
                 "No database records"
             }
-            @if let Some(selected_id) = id && let Some(selected_type) = monitor_type {
+            @if let Some(selected_id) = id {
                 section {
-                    form action={ "/edit/" (selected_type) "/" (selected_id) } method="get" {
+                    form action={ "/edit/" (selected_id) } method="get" {
                         header {
                             h3 { "Record ID " (selected_id) " selected" }
                             input type="Submit" value="Edit";
