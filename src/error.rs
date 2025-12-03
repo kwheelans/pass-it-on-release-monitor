@@ -11,10 +11,6 @@ pub enum Error {
     #[error("No configuration present: {0}")]
     MissingConfiguration(String),
 
-    /// No monitors found after processing the configuration
-    #[error("No valid configured monitors")]
-    NoMonitors,
-
     /// Cannot create a Monitor from the entity Model data
     #[error("Unable to create known Monitor type from Model")]
     ModelConversionFailed,

@@ -70,8 +70,8 @@ async fn run(args: CliArgs) -> Result<(), Error> {
 
     // Get database connection
     let db_uri = match config.global.persist {
-        true => config.global.uri.as_str(),
-        false => SQLITE_MEMORY,
+        true => config.global.db_uri(),
+        false => SQLITE_MEMORY.into(),
     };
     let db = Database::connect(db_uri).await?;
     db.get_schema_builder()

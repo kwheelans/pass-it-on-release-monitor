@@ -2,7 +2,7 @@ use crate::monitors::Monitor;
 use pass_it_on::ClientConfigFile;
 use serde::{Deserialize, Serialize};
 
-const DEFAULT_DATA_PATH: &str = "sqlite://release-monitor.sqlite";
+const DEFAULT_DATA_PATH: &str = "release-monitor.sqlite";
 
 #[derive(Debug, Deserialize)]
 pub struct ReleaseMonitorConfiguration {
@@ -21,7 +21,7 @@ pub struct MonitorConfiguration {
 #[serde(default)]
 pub struct GlobalConfiguration {
     pub persist: bool,
-    pub uri: String,
+    pub db_path: String,
     pub web_ui_port: u16,
     pub web_ui_address: String,
     pub github_personal_token: Option<String>,
@@ -31,11 +31,17 @@ impl Default for GlobalConfiguration {
     fn default() -> Self {
         Self {
             persist: true,
-            uri: DEFAULT_DATA_PATH.to_string(),
+            db_path: DEFAULT_DATA_PATH.to_string(),
             web_ui_port: 8080,
             web_ui_address: "0.0.0.0".to_string(),
             github_personal_token: None,
         }
+    }
+}
+
+impl GlobalConfiguration {
+    pub fn db_uri(&self) -> String {
+        format!("{}{}{}", "sqlite://", self.db_path.as_str(), "?mode=rwc")
     }
 }
 
