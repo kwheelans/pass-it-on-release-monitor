@@ -1,4 +1,6 @@
 # Unreleased
+
+# v0.4.0
 ## Features
 - Persist data with SQLite database
 - Serve Web UI to create, update or delete monitors
