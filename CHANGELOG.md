@@ -1,5 +1,7 @@
 # Unreleased
-
+## Features
+- Persist data with SQLite database
+- Serve Web UI to create, update or delete monitors
 
 # v0.3.1
 - update `octocrab` dependency  to version 0.44.y
