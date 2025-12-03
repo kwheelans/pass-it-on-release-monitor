@@ -80,7 +80,7 @@ async fn run(args: CliArgs) -> Result<(), Error> {
         .await?;
 
     // Initialize state & listener for Axum
-    let state = AppState::new(db, None, None, None);
+    let state = AppState::new(db);
     let listener = tokio::net::TcpListener::bind(format!(
         "{}:{}",
         config.global.web_ui_address, config.global.web_ui_port

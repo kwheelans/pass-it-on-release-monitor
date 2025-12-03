@@ -1,8 +1,7 @@
-use crate::database::MonitorModel;
 use crate::monitors::{FrequencyPeriod, FrequencyValue};
-use crate::ui::handlers::add::{get_ui_add_monitor, submit_add_monitor_record};
-use crate::ui::handlers::edit::get_edit_monitor;
-use crate::ui::handlers::index::{delete_monitor_record, get_index, get_index_select_id};
+use crate::ui::handlers::add::{get_add_monitor, post_add_monitor_record};
+use crate::ui::handlers::edit::{get_edit_monitor, post_edit_monitor_record};
+use crate::ui::handlers::index::{delete_monitor_record, get_index};
 use axum::routing::get;
 use axum::{Router, serve};
 use sea_orm::DatabaseConnection;
@@ -19,60 +18,29 @@ const ADD_RECORD_TITLE: &str = "Add Monitor Record";
 #[derive(Debug, Clone)]
 pub struct AppState {
     db: DatabaseConnection,
-    id: Option<i64>,
-    monitor_type: Option<String>,
-    model: Option<MonitorModel>,
 }
 
 impl AppState {
-    pub fn new(
-        db: DatabaseConnection,
-        id: Option<i64>,
-        monitor_type: Option<String>,
-        model: Option<MonitorModel>,
-    ) -> Self {
-        Self {
-            db,
-            id,
-            monitor_type,
-            model,
-        }
+    pub fn new(db: DatabaseConnection) -> Self {
+        Self { db }
     }
-    pub fn set_id(&mut self, id: Option<i64>) {
-        self.id = id;
-    }
-    pub fn set_monitor_type(&mut self, monitor_type: Option<String>) {
-        self.monitor_type = monitor_type;
-    }
-    pub fn set_model(&mut self, model: Option<MonitorModel>) {
-        self.model = model
-    }
-
     pub fn db(&self) -> &DatabaseConnection {
         &self.db
-    }
-
-    pub fn id(&self) -> Option<i64> {
-        self.id
-    }
-
-    pub fn monitor_type(&self) -> &Option<String> {
-        &self.monitor_type
     }
 }
 
 pub async fn serve_web_ui(state: AppState, listener: TcpListener) {
     let routes = Router::new()
         .route("/", get(get_index))
-        .route(
-            "/{id}",
-            get(get_index_select_id).post(delete_monitor_record),
-        )
+        .route("/{id}", get(get_index).post(delete_monitor_record))
         .route(
             "/add/{monitor_type}",
-            get(get_ui_add_monitor).post(submit_add_monitor_record),
+            get(get_add_monitor).post(post_add_monitor_record),
         )
-        .route("/edit/{id}", get(get_edit_monitor))
+        .route(
+            "/edit/{id}",
+            get(get_edit_monitor).post(post_edit_monitor_record),
+        )
         .with_state(state);
 
     serve(listener, routes).await.expect("axum serve error")

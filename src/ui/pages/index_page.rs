@@ -7,22 +7,22 @@ use axum::extract::State;
 use maud::{Markup, html};
 use tracing::log::debug;
 
-pub async fn index_page(state: State<AppState>, page_title: &str) -> Markup {
+pub async fn index_page(state: State<AppState>, page_title: &str, id: Option<i64>) -> Markup {
     html! {
         (base().await)
         body {
             (title(page_title).await)
             main {
-                (list_records(state).await)
+                (list_records(state, id).await)
             }
         }
     }
 }
 
-async fn list_records(state: State<AppState>) -> Markup {
-    let db = state.db();
-    let id = state.id();
-    let records = select_all_monitors(db).await.expect("unable to select");
+async fn list_records(state: State<AppState>, id: Option<i64>) -> Markup {
+    let records = select_all_monitors(state.db())
+        .await
+        .expect("unable to select");
     let has_records = !records.is_empty();
     debug!("Index: {:?}", id);
     debug!("Has_records: {}", has_records);

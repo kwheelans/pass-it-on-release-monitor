@@ -1,5 +1,7 @@
-use crate::monitors::github_release::GithubConfiguration;
-use crate::monitors::rancher_channel_server::RancherChannelServerConfiguration;
+use crate::monitors::github_release::{GithubConfiguration, TYPE_NAME_GITHUB};
+use crate::monitors::rancher_channel_server::{
+    RancherChannelServerConfiguration, TYPE_NAME_RANCHER_CHANNEL,
+};
 use crate::monitors::{FrequencyPeriod, FrequencyValue};
 use crate::ui::pages::{base, title};
 use maud::{Markup, html};
@@ -19,6 +21,7 @@ pub async fn edit_github_monitor_page(page_title: &str, monitor: GithubConfigura
                     label for="token" { "Github Personal Token" }
                     input type="password" id="token" name="token" placeholder="Enter Github Personal Token" value=(monitor.inner.github_personal_token.unwrap_or_default()) ;
                     div {
+                        input type="hidden" id="monitor_type" name="monitor_type" value=(TYPE_NAME_GITHUB);
                         input type="submit" value="Save";
                         a href="/" {
                             input type="button" value="Cancel";
@@ -46,6 +49,7 @@ pub async fn edit_rancher_channel_monitor_page(
                     input type="text" id="channel" name="channel" placeholder="Enter Channel Name"  value=(monitor.inner.channel) minlength="1" required;
                     (common(monitor.name.as_str(), monitor.inner.notification.as_str(), monitor.inner.period, monitor.inner.frequency).await)
                     div {
+                        input type="hidden" id="monitor_type" name="monitor_type" value=(TYPE_NAME_RANCHER_CHANNEL);
                         input type="submit" value="Save";
                         a href="/" {
                             input type="button" value="Cancel";
