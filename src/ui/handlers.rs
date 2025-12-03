@@ -1,10 +1,10 @@
+use crate::ui::handlers::add::get_ui_add_monitor;
+use crate::ui::handlers::edit::get_ui_edit_monitor;
+use crate::ui::handlers::index::{delete_monitor_record, get_ui_index, get_ui_index_select_id};
+use axum::routing::get;
 use axum::{serve, Router};
-use axum::routing::{get, post};
 use sea_orm::DatabaseConnection;
 use tokio::net::TcpListener;
-use crate::webpage::handlers::add::get_ui_add_monitor;
-use crate::webpage::handlers::edit::get_ui_edit_monitor;
-use crate::webpage::handlers::index::{delete_monitor_record, get_ui_index, get_ui_index_select_id};
 
 pub mod add;
 pub mod edit;
@@ -51,7 +51,10 @@ impl AppState {
 pub async fn serve_web_ui(state: AppState, listener: TcpListener) {
     let routes = Router::new()
         .route("/", get(get_ui_index))
-        .route("/{id}", get(get_ui_index_select_id).post(delete_monitor_record))
+        .route(
+            "/{id}",
+            get(get_ui_index_select_id).post(delete_monitor_record),
+        )
         .route("/add/{monitor_type}", get(get_ui_add_monitor))
         .route("/edit/{id}", get(get_ui_edit_monitor))
         .with_state(state);

@@ -3,7 +3,7 @@ mod configuration;
 mod database;
 mod error;
 mod monitors;
-mod webpage;
+mod ui;
 
 use crate::cli::CliArgs;
 use crate::configuration::ReleaseMonitorConfiguration;
@@ -11,6 +11,7 @@ use crate::database::MonitorEntity;
 use crate::database::queries::insert_monitor;
 use crate::error::Error;
 use crate::monitors::start_monitoring;
+use crate::ui::handlers::{AppState, serve_web_ui};
 use clap::Parser;
 use pass_it_on::start_client;
 use sea_orm::Database;
@@ -24,7 +25,6 @@ use tracing_subscriber::filter::Targets;
 use tracing_subscriber::fmt;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
-use crate::webpage::handlers::{serve_web_ui, AppState};
 
 const SQLITE_MEMORY: &str = "sqlite::memory:";
 

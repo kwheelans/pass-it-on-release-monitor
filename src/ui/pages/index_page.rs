@@ -2,7 +2,7 @@ use crate::AppState;
 use crate::database::queries::select_all_monitors;
 use crate::monitors::github_release::TYPE_NAME_GITHUB;
 use crate::monitors::rancher_channel_server::TYPE_NAME_RANCHER_CHANNEL;
-use crate::webpage::common_page::{base, title};
+use crate::ui::pages::{base, title};
 use axum::extract::State;
 use maud::{Markup, html};
 use tracing::log::debug;

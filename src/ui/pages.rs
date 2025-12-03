@@ -1,6 +1,10 @@
+pub(super) mod add_page;
+pub(super) mod edit_page;
+pub(super) mod index_page;
+
 use maud::{DOCTYPE, Markup, html};
 
-pub(super) async fn base() -> Markup {
+pub async fn base() -> Markup {
     html! {
         (DOCTYPE)
         html {
@@ -14,7 +18,7 @@ pub(super) async fn base() -> Markup {
     }
 }
 
-pub(super) async fn title(title: &str) -> Markup {
+pub async fn title(title: &str) -> Markup {
     html! {
         header {
             h1 { (title) };

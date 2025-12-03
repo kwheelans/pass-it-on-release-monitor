@@ -1,7 +1,7 @@
-use maud::{html, Markup};
 use crate::monitors::github_release::TYPE_NAME_GITHUB;
 use crate::monitors::rancher_channel_server::TYPE_NAME_RANCHER_CHANNEL;
-use crate::webpage::common_page::{base, title};
+use crate::ui::pages::{base, title};
+use maud::{Markup, html};
 
 pub async fn add_github_monitor_page(page_title: &str) -> Markup {
     html! {
