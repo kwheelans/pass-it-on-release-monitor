@@ -1,9 +1,12 @@
-use crate::ui::handlers::add::get_ui_add_monitor;
-use crate::ui::handlers::edit::get_ui_edit_monitor;
-use crate::ui::handlers::index::{delete_monitor_record, get_ui_index, get_ui_index_select_id};
+use crate::database::MonitorModel;
+use crate::monitors::{FrequencyPeriod, FrequencyValue};
+use crate::ui::handlers::add::{get_ui_add_monitor, submit_add_monitor_record};
+use crate::ui::handlers::edit::get_edit_monitor;
+use crate::ui::handlers::index::{delete_monitor_record, get_index, get_index_select_id};
 use axum::routing::get;
-use axum::{serve, Router};
+use axum::{Router, serve};
 use sea_orm::DatabaseConnection;
+use std::collections::HashMap;
 use tokio::net::TcpListener;
 
 pub mod add;
@@ -18,14 +21,21 @@ pub struct AppState {
     db: DatabaseConnection,
     id: Option<i64>,
     monitor_type: Option<String>,
+    model: Option<MonitorModel>,
 }
 
 impl AppState {
-    pub fn new(db: DatabaseConnection, id: Option<i64>, monitor_type: Option<String>) -> Self {
+    pub fn new(
+        db: DatabaseConnection,
+        id: Option<i64>,
+        monitor_type: Option<String>,
+        model: Option<MonitorModel>,
+    ) -> Self {
         Self {
             db,
             id,
             monitor_type,
+            model,
         }
     }
     pub fn set_id(&mut self, id: Option<i64>) {
@@ -33,6 +43,9 @@ impl AppState {
     }
     pub fn set_monitor_type(&mut self, monitor_type: Option<String>) {
         self.monitor_type = monitor_type;
+    }
+    pub fn set_model(&mut self, model: Option<MonitorModel>) {
+        self.model = model
     }
 
     pub fn db(&self) -> &DatabaseConnection {
@@ -50,14 +63,62 @@ impl AppState {
 
 pub async fn serve_web_ui(state: AppState, listener: TcpListener) {
     let routes = Router::new()
-        .route("/", get(get_ui_index))
+        .route("/", get(get_index))
         .route(
             "/{id}",
-            get(get_ui_index_select_id).post(delete_monitor_record),
+            get(get_index_select_id).post(delete_monitor_record),
         )
-        .route("/add/{monitor_type}", get(get_ui_add_monitor))
-        .route("/edit/{id}", get(get_ui_edit_monitor))
+        .route(
+            "/add/{monitor_type}",
+            get(get_ui_add_monitor).post(submit_add_monitor_record),
+        )
+        .route("/edit/{id}", get(get_edit_monitor))
         .with_state(state);
 
     serve(listener, routes).await.expect("axum serve error")
+}
+
+fn common_form_values(
+    form: &HashMap<String, String>,
+) -> (String, String, FrequencyValue, FrequencyPeriod) {
+    let name = form.get("name").expect("unable to retrieve name");
+    let notification = form
+        .get("notification")
+        .expect("unable to retrieve notification");
+    let frequency = FrequencyValue::try_from(
+        form.get("frequency")
+            .expect("unable to retrieve frequency")
+            .as_ref(),
+    )
+    .unwrap_or_default();
+    let period = FrequencyPeriod::try_from(
+        form.get("period")
+            .expect("unable to retrieve period")
+            .as_ref(),
+    )
+    .unwrap_or_default();
+    (name.into(), notification.into(), frequency, period)
+}
+
+fn github_form_values(form: &HashMap<String, String>) -> (String, String, Option<String>) {
+    let owner = form.get("owner").expect("unable to retrieve owner").into();
+    let repo = form.get("repo").expect("unable to retrieve repo").into();
+    let token = form
+        .get("token")
+        .expect("unable to retrieve token")
+        .to_string();
+    let token = match token.is_empty() {
+        true => None,
+        false => Some(token),
+    };
+    (owner, repo, token)
+}
+
+fn rancher_channel_form_values(form: &HashMap<String, String>) -> (String, String) {
+    let url = form.get("url").expect("unable to retrieve url").into();
+    let channel = form
+        .get("channel")
+        .expect("unable to retrieve channel")
+        .into();
+    (url, channel)
 }

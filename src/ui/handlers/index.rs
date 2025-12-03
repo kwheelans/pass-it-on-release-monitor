@@ -7,17 +7,17 @@ use maud::Markup;
 use tracing::debug;
 
 /// Display the Index Page
-pub async fn get_ui_index(state: State<AppState>) -> Result<Markup, StatusCode> {
+pub async fn get_index(state: State<AppState>) -> Result<Markup, StatusCode> {
     Ok(index_page(state, INDEX_PAGE_TITLE).await)
 }
 
-pub async fn get_ui_index_select_id(
+pub async fn get_index_select_id(
     mut state: State<AppState>,
     Path(id): Path<i64>,
 ) -> Result<Markup, StatusCode> {
     debug!("Selected record id: {}", id);
     state.set_id(Some(id));
-    get_ui_index(state).await
+    get_index(state).await
 }
 
 pub async fn delete_monitor_record(
@@ -28,5 +28,5 @@ pub async fn delete_monitor_record(
     delete_monitor(&state.db, id)
         .await
         .expect("unable to delete record");
-    get_ui_index(state).await
+    get_index(state).await
 }

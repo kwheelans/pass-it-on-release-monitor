@@ -20,6 +20,7 @@ use std::collections::HashMap;
 use std::fmt::Debug;
 use std::num::ParseIntError;
 use std::time::Duration;
+use strum::EnumString;
 use tokio::sync::mpsc;
 use tracing::{debug, error, trace, warn};
 
@@ -58,7 +59,7 @@ impl Clone for Box<dyn Monitor> {
     }
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Eq, PartialEq, Default, Serialize, Deserialize, EnumString)]
 pub enum FrequencyPeriod {
     #[serde(alias = "minute")]
     Minute,

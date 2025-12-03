@@ -1,24 +1,33 @@
-use crate::database::queries::select_one_monitor;
-use crate::monitors::github_release::{GithubConfiguration, TYPE_NAME_GITHUB};
-use crate::monitors::rancher_channel_server::{
-    RancherChannelServerConfiguration, TYPE_NAME_RANCHER_CHANNEL,
+use crate::database::queries::{select_one_monitor, update_monitor};
+use crate::monitors::Monitor;
+use crate::monitors::github_release::{
+    GithubConfiguration, GithubConfigurationInner, TYPE_NAME_GITHUB,
 };
-use crate::ui::handlers::{ADD_RECORD_TITLE, AppState};
+use crate::monitors::rancher_channel_server::{
+    RancherChannelServerConfiguration, RancherChannelServerConfigurationInner,
+    TYPE_NAME_RANCHER_CHANNEL,
+};
+use crate::ui::handlers::index::get_index;
+use crate::ui::handlers::{
+    ADD_RECORD_TITLE, AppState, common_form_values, github_form_values, rancher_channel_form_values,
+};
 use crate::ui::pages::edit_page::{edit_github_monitor_page, edit_rancher_channel_monitor_page};
+use axum::Form;
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use maud::Markup;
-use sea_orm::DatabaseConnection;
-use tracing::error;
+use sea_orm::{IntoActiveModel, Set};
+use std::collections::HashMap;
+use tracing::{debug, error};
 
-pub async fn get_ui_edit_monitor(
+pub async fn get_edit_monitor(
     state: State<AppState>,
     Path(id): Path<i64>,
 ) -> Result<Markup, StatusCode> {
     match select_one_monitor(state.db(), id).await {
         Ok(Some(model)) => match model.monitor_type.as_str() {
-            TYPE_NAME_GITHUB => Ok(edit_github_monitor(id, &state.db).await?),
-            TYPE_NAME_RANCHER_CHANNEL => Ok(edit_rancher_channel_monitor(id, &state.db).await?),
+            TYPE_NAME_GITHUB => Ok(edit_github_monitor(id, state).await?),
+            TYPE_NAME_RANCHER_CHANNEL => Ok(edit_rancher_channel_monitor(id, state).await?),
             _ => Err(StatusCode::NOT_FOUND),
         },
         Ok(None) => {
@@ -32,14 +41,17 @@ pub async fn get_ui_edit_monitor(
     }
 }
 
-async fn edit_github_monitor(id: i64, db: &DatabaseConnection) -> Result<Markup, StatusCode> {
-    match select_one_monitor(db, id).await.expect("unable to select") {
+async fn edit_github_monitor(id: i64, state: State<AppState>) -> Result<Markup, StatusCode> {
+    match select_one_monitor(state.db(), id)
+        .await
+        .expect("unable to select")
+    {
         None => Err(StatusCode::NO_CONTENT),
         Some(model) => {
             match serde_json::from_str::<GithubConfiguration>(model.configuration.as_str()) {
                 Ok(monitor) => Ok(edit_github_monitor_page(ADD_RECORD_TITLE, monitor).await),
                 Err(e) => {
-                    error!("Unbale to parse JSON: {}", e);
+                    error!("Unable to parse JSON: {}", e);
                     Err(StatusCode::NOT_FOUND)
                 }
             }
@@ -49,15 +61,19 @@ async fn edit_github_monitor(id: i64, db: &DatabaseConnection) -> Result<Markup,
 
 async fn edit_rancher_channel_monitor(
     id: i64,
-    db: &DatabaseConnection,
+    mut state: State<AppState>,
 ) -> Result<Markup, StatusCode> {
-    match select_one_monitor(db, id).await.expect("unable to select") {
+    match select_one_monitor(state.db(), id)
+        .await
+        .expect("unable to select")
+    {
         None => Err(StatusCode::NO_CONTENT),
         Some(model) => {
             match serde_json::from_str::<RancherChannelServerConfiguration>(
                 model.configuration.as_str(),
             ) {
                 Ok(monitor) => {
+                    state.set_model(Some(model));
                     Ok(edit_rancher_channel_monitor_page(ADD_RECORD_TITLE, monitor).await)
                 }
                 Err(e) => {
@@ -67,4 +83,65 @@ async fn edit_rancher_channel_monitor(
             }
         }
     }
+}
+
+pub async fn submit_edit_monitor_record(
+    state: State<AppState>,
+    Path((monitor_type, id)): Path<(String, i64)>,
+    Form(form): Form<HashMap<String, String>>,
+) -> Result<Markup, StatusCode> {
+    let monitor = match monitor_type.as_str() {
+        TYPE_NAME_GITHUB => Ok(submit_edit_github_monitor(form).await),
+        TYPE_NAME_RANCHER_CHANNEL => Ok(submit_edit_rancher_channel_monitor(form).await),
+        _ => Err(StatusCode::NOT_FOUND),
+    }?;
+
+    if let Some(model) = state.model.clone() {
+        let mut model = model.into_active_model();
+        model.name = Set(monitor.name());
+        model.configuration = Set(monitor.inner_to_json());
+
+        match update_monitor(state.db(), model).await {
+            Ok(_) => Ok(get_index(state).await?),
+            Err(e) => {
+                debug!("{}", e);
+                Err(StatusCode::INTERNAL_SERVER_ERROR)
+            }
+        }
+    } else {
+        Err(StatusCode::INTERNAL_SERVER_ERROR)
+    }
+}
+
+async fn submit_edit_github_monitor(form: HashMap<String, String>) -> Box<dyn Monitor> {
+    let (owner, repo, github_personal_token) = github_form_values(&form);
+    let (name, notification, frequency, period) = common_form_values(&form);
+
+    Box::new(GithubConfiguration {
+        name,
+        inner: GithubConfigurationInner {
+            owner,
+            repo,
+            notification,
+            frequency,
+            period,
+            github_personal_token,
+        },
+    })
+}
+
+async fn submit_edit_rancher_channel_monitor(form: HashMap<String, String>) -> Box<dyn Monitor> {
+    let (url, channel) = rancher_channel_form_values(&form);
+    let (name, notification, frequency, period) = common_form_values(&form);
+
+    Box::new(RancherChannelServerConfiguration {
+        name,
+        inner: RancherChannelServerConfigurationInner {
+            url,
+            channel,
+            notification,
+            frequency,
+            period,
+        },
+    })
 }
