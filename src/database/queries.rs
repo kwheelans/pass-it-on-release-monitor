@@ -1,8 +1,11 @@
 use crate::database::{MonitorActiveModel, MonitorEntity, MonitorModel, monitors};
 use crate::monitors::Monitor;
-use sea_orm::prelude::DateTimeUtc;
+use sea_orm::prelude::{DateTimeUtc, Expr};
 use sea_orm::sea_query::OnConflict;
-use sea_orm::{ActiveModelTrait, DatabaseConnection, DbErr, EntityTrait, ModelTrait, Set};
+use sea_orm::{
+    ActiveModelTrait, DatabaseConnection, DbErr, EntityTrait, ExprTrait, ModelTrait, Set,
+};
+use std::fmt::Debug;
 use tracing::debug;
 use tracing::log::warn;
 
@@ -27,6 +30,7 @@ pub async fn insert_monitor(
         .do_nothing()
         .to_owned();
     let conflict_name = OnConflict::column(monitors::Column::Name)
+        .action_and_where(Expr::col(monitors::Column::MonitorType).is(monitor.monitor_type()))
         .update_column(monitors::Column::Configuration)
         .to_owned();
     let monitor = MonitorActiveModel {
@@ -46,9 +50,12 @@ pub async fn insert_monitor(
     insert_result(result)
 }
 
-fn insert_result<T>(result: Result<T, DbErr>) -> Result<(), DbErr> {
+fn insert_result<T: Debug>(result: Result<T, DbErr>) -> Result<(), DbErr> {
     match result {
-        Ok(_) => Ok(()),
+        Ok(r) => {
+            debug!("Insert Result: {:?}", r);
+            Ok(())
+        }
         Err(DbErr::RecordNotInserted) => {
             warn!("Record not inserted.");
             Ok(())

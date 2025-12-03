@@ -17,7 +17,7 @@ use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use maud::Markup;
 use std::collections::HashMap;
-use tracing::debug;
+use tracing::{debug, error};
 
 /// Display the Add Monitor page
 pub async fn get_add_monitor(Path(monitor_type): Path<String>) -> Result<Markup, StatusCode> {
@@ -47,10 +47,13 @@ pub async fn post_add_monitor_record(
         _ => Err(StatusCode::NOT_FOUND),
     }?;
 
-    insert_monitor(&state.db, monitor)
-        .await
-        .expect("unable to insert");
-    get_index(state, None).await
+    match insert_monitor(state.db(), monitor).await {
+        Ok(_) => get_index(state, None).await,
+        Err(e) => {
+            error!("Unable to insert record: {}", e);
+            Err(StatusCode::INTERNAL_SERVER_ERROR)
+        }
+    }
 }
 
 async fn post_add_github_monitor(form: HashMap<String, String>) -> Box<dyn Monitor> {
