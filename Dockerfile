@@ -1,4 +1,4 @@
-FROM lukemathwalker/cargo-chef:latest as chef
+FROM lukemathwalker/cargo-chef:latest AS chef
 
 FROM chef AS planner
 WORKDIR /recipe
@@ -17,7 +17,7 @@ COPY . .
 RUN cargo build --release --frozen --bin pass-it-on-release-monitor
 
 # Final image
-FROM debian:12-slim
+FROM debian:13-slim
 
 RUN mkdir /pass-it-on-release-monitor /data
 WORKDIR /pass-it-on-release-monitor
