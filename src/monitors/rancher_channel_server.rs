@@ -1,16 +1,23 @@
+use crate::configuration::GlobalConfiguration;
 use crate::error::Error;
 use crate::monitors::{FrequencyPeriod, FrequencyValue, Monitor, ReleaseData};
 use async_trait::async_trait;
+use chrono::TimeDelta;
 use pass_it_on::notifications::{ClientReadyMessage, Message};
-use serde::Deserialize;
-use std::time::Duration;
+use serde::{Deserialize, Serialize};
 use tracing::trace;
-use crate::configuration::GlobalConfiguration;
 
-const TYPE_NAME: &str = "rancher-channel";
+pub const TYPE_NAME_RANCHER_CHANNEL: &str = "rancher-channel";
 
-#[derive(Deserialize, Debug)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RancherChannelServerConfiguration {
+    pub name: String,
+    #[serde(flatten)]
+    pub inner: RancherChannelServerConfigurationInner,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RancherChannelServerConfigurationInner {
     pub url: String,
     pub channel: String,
     pub notification: String,
@@ -21,7 +28,7 @@ pub struct RancherChannelServerConfiguration {
 }
 
 #[allow(dead_code)]
-#[derive(Deserialize, Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 #[serde(tag = "type")]
 pub struct Collection {
     pub links: Links,
@@ -33,7 +40,7 @@ pub struct Collection {
 }
 
 #[allow(dead_code)]
-#[derive(Deserialize, Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 #[serde(tag = "type")]
 pub struct Channels {
     pub id: String,
@@ -43,19 +50,19 @@ pub struct Channels {
 }
 
 #[allow(dead_code)]
-#[derive(Deserialize, Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Links {
     #[serde(rename = "self")]
     pub link: String,
 }
 
-#[derive(Deserialize, Debug, Default)]
+#[derive(Debug, Serialize, Deserialize, Default)]
 pub struct Actions;
 
 #[async_trait]
-#[typetag::deserialize(name = "rancher-channel")]
+#[typetag::serde(name = "rancher-channel")]
 impl Monitor for RancherChannelServerConfiguration {
-    async fn check(&self) -> Result<ReleaseData, Error> {
+    async fn check(&self, _github_configs: &GlobalConfiguration) -> Result<ReleaseData, Error> {
         self.check_channel().await
     }
 
@@ -63,46 +70,41 @@ impl Monitor for RancherChannelServerConfiguration {
         Message::new(format!(
             "Version {} now available for channel {} at {}",
             version.version,
-            self.channel.as_str(),
-            self.url.as_str()
+            self.inner.channel.as_str(),
+            self.inner.url.as_str()
         ))
-        .to_client_ready_message(self.notification.as_str())
+        .to_client_ready_message(self.inner.notification.as_str())
     }
 
     fn monitor_type(&self) -> String {
-        TYPE_NAME.to_string()
+        TYPE_NAME_RANCHER_CHANNEL.to_string()
     }
 
-    fn monitor_id(&self) -> String {
-        format!(
-            "{}-{}-{}",
-            self.monitor_type(),
-            self.channel.as_str(),
-            self.url.as_str()
-        )
+    fn name(&self) -> String {
+        self.name.to_string()
     }
 
-    fn frequency(&self) -> Duration {
-        self.period.to_duration(self.frequency.0)
+    fn frequency(&self) -> TimeDelta {
+        self.inner.period.to_duration(self.inner.frequency.0)
     }
 
-    fn set_global_configs(&mut self, _configs: &GlobalConfiguration) {
-        //Nothing to do
+    fn inner_to_json(&self) -> String {
+        serde_json::to_string(&self.inner).expect("monitor to_json failed")
     }
 }
 
 impl RancherChannelServerConfiguration {
     async fn get_channels(&self) -> Result<Collection, Error> {
-        let data = reqwest::get(self.url.as_str()).await?.text().await?;
+        let data = reqwest::get(self.inner.url.as_str()).await?.text().await?;
         Ok(serde_json::from_str(data.as_str())?)
     }
 
     async fn check_channel(&self) -> Result<ReleaseData, Error> {
-        trace!("Checking Rancher Channels for {}", self.monitor_id());
+        trace!("Checking Rancher Channels for {}", self.name());
         let channels = self.get_channels().await?;
 
-        trace!("Received Rancher Channels for {}", self.monitor_id());
-        let search = self.channel.as_str();
+        trace!("Received Rancher Channels for {}", self.name());
+        let search = self.inner.channel.as_str();
 
         match channels
             .data
