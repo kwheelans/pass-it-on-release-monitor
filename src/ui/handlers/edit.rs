@@ -27,8 +27,8 @@ pub async fn get_edit_monitor(
 ) -> Result<Markup, StatusCode> {
     match select_one_monitor(state.db(), id).await {
         Ok(Some(model)) => match model.monitor_type.as_str() {
-            TYPE_NAME_GITHUB => Ok(edit_github_monitor(model).await?),
-            TYPE_NAME_RANCHER_CHANNEL => Ok(edit_rancher_channel_monitor(model).await?),
+            TYPE_NAME_GITHUB => Ok(edit_github_monitor(state, model).await?),
+            TYPE_NAME_RANCHER_CHANNEL => Ok(edit_rancher_channel_monitor(state, model).await?),
             _ => Err(StatusCode::NOT_FOUND),
         },
         Ok(None) => {
@@ -42,14 +42,17 @@ pub async fn get_edit_monitor(
     }
 }
 
-async fn edit_github_monitor(model: MonitorModel) -> Result<Markup, StatusCode> {
+async fn edit_github_monitor(
+    state: State<AppState>,
+    model: MonitorModel,
+) -> Result<Markup, StatusCode> {
     match serde_json::from_str::<GithubConfigurationInner>(model.configuration.as_str()) {
         Ok(inner) => {
             let monitor = GithubConfiguration {
                 name: model.name.clone(),
                 inner,
             };
-            Ok(edit_github_monitor_page(ADD_RECORD_TITLE, monitor).await)
+            Ok(edit_github_monitor_page(ADD_RECORD_TITLE, state.css_path(), monitor).await)
         }
         Err(e) => {
             error!("Unable to parse JSON: {}", e);
@@ -58,7 +61,10 @@ async fn edit_github_monitor(model: MonitorModel) -> Result<Markup, StatusCode> 
     }
 }
 
-async fn edit_rancher_channel_monitor(model: MonitorModel) -> Result<Markup, StatusCode> {
+async fn edit_rancher_channel_monitor(
+    state: State<AppState>,
+    model: MonitorModel,
+) -> Result<Markup, StatusCode> {
     match serde_json::from_str::<RancherChannelServerConfigurationInner>(
         model.configuration.as_str(),
     ) {
@@ -67,7 +73,10 @@ async fn edit_rancher_channel_monitor(model: MonitorModel) -> Result<Markup, Sta
                 name: model.name.clone(),
                 inner,
             };
-            Ok(edit_rancher_channel_monitor_page(ADD_RECORD_TITLE, monitor).await)
+            Ok(
+                edit_rancher_channel_monitor_page(ADD_RECORD_TITLE, state.css_path(), monitor)
+                    .await,
+            )
         }
         Err(e) => {
             error!("Unbale to parse JSON: {}", e);

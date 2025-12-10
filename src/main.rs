@@ -6,7 +6,7 @@ mod monitors;
 mod ui;
 
 use crate::cli::CliArgs;
-use crate::configuration::ReleaseMonitorConfiguration;
+use crate::configuration::{ReleaseMonitorConfiguration, get_css_path};
 use crate::database::MonitorEntity;
 use crate::database::queries::add_static_monitor;
 use crate::error::Error;
@@ -35,10 +35,16 @@ async fn main() -> ExitCode {
         LevelFilter::from_str(std::env::var("VERBOSITY").unwrap_or_default().as_str())
             .unwrap_or(LevelFilter::INFO),
     );
+    let sqlx_log_level = match verbosity {
+        LevelFilter::TRACE => LevelFilter::TRACE,
+        LevelFilter::DEBUG => LevelFilter::DEBUG,
+        _ => LevelFilter::WARN,
+    };
 
     // Configure logging
     let log_filter = Targets::default()
         .with_target("pass_it_on_release_monitor", verbosity)
+        .with_target("sqlx", sqlx_log_level)
         .with_default(LevelFilter::INFO);
     tracing_subscriber::registry()
         .with(fmt::layer())
@@ -79,11 +85,14 @@ async fn run(args: CliArgs) -> Result<(), Error> {
         .sync(&db)
         .await?;
 
+    // Set CSS Path
+    let css_path = get_css_path(config.webui.pico_css_base_path, config.webui.pico_css_color);
+
     // Initialize state & listener for Axum
-    let state = AppState::new(db);
+    let state = AppState::new(db, css_path);
     let listener = tokio::net::TcpListener::bind(format!(
         "{}:{}",
-        config.global.web_ui_address, config.global.web_ui_port
+        config.webui.listen_address, config.webui.port
     ))
     .await?;
     let db = state.db().clone();

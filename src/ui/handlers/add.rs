@@ -20,16 +20,21 @@ use std::collections::HashMap;
 use tracing::debug;
 
 /// Display the Add Monitor page
-pub async fn get_add_monitor(Path(monitor_type): Path<String>) -> Result<Markup, StatusCode> {
+pub async fn get_add_monitor(
+    state: State<AppState>,
+    Path(monitor_type): Path<String>,
+) -> Result<Markup, StatusCode> {
     debug!("Display Add monitor record");
 
     match monitor_type.as_str() {
         TYPE_NAME_GITHUB => Ok(add_github_monitor_page(
             format!("{} - {}", ADD_RECORD_TITLE, "Github").as_str(),
+            state.css_path(),
         )
         .await),
         TYPE_NAME_RANCHER_CHANNEL => Ok(add_rancher_channel_page(
             format!("{} - {}", ADD_RECORD_TITLE, "Rancher-Channel").as_str(),
+            state.css_path(),
         )
         .await),
         _ => Err(StatusCode::NOT_FOUND),

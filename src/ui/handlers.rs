@@ -18,14 +18,19 @@ const ADD_RECORD_TITLE: &str = "Add Monitor Record";
 #[derive(Debug, Clone)]
 pub struct AppState {
     db: DatabaseConnection,
+    css_path: String,
 }
 
 impl AppState {
-    pub fn new(db: DatabaseConnection) -> Self {
-        Self { db }
+    pub fn new(db: DatabaseConnection, css_path: String) -> Self {
+        Self { db, css_path }
     }
     pub fn db(&self) -> &DatabaseConnection {
         &self.db
+    }
+
+    pub fn css_path(&self) -> &str {
+        &self.css_path
     }
 }
 

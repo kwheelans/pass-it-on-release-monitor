@@ -4,13 +4,18 @@ use crate::monitors::rancher_channel_server::TYPE_NAME_RANCHER_CHANNEL;
 use crate::ui::pages::{base, title};
 use maud::{Markup, html};
 use sea_orm::prelude::ChronoUtc;
-use tracing::log::debug;
+use tracing::trace;
 
 const DATE_FORMAT: &str = "%Y-%m-%d %H:%M:%S %Z";
 
-pub async fn index_page(page_title: &str, records: Vec<MonitorModel>, id: Option<i64>) -> Markup {
+pub async fn index_page(
+    page_title: &str,
+    css_path: &str,
+    records: Vec<MonitorModel>,
+    id: Option<i64>,
+) -> Markup {
     html! {
-        (base().await)
+        (base(css_path).await)
         body {
             (title(page_title).await)
             main {
@@ -23,8 +28,8 @@ pub async fn index_page(page_title: &str, records: Vec<MonitorModel>, id: Option
 async fn list_records(records: Vec<MonitorModel>, id: Option<i64>) -> Markup {
     let now = ChronoUtc::now().format(DATE_FORMAT);
     let has_records = !records.is_empty();
-    debug!("Index: {:?}", id);
-    debug!("Has_records: {}", has_records);
+    trace!("Index: {:?}", id);
+    trace!("Has_records: {}", has_records);
 
     html! {
         section {
