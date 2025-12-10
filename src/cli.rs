@@ -9,6 +9,10 @@ pub struct CliArgs {
     #[clap(short, long, value_parser)]
     pub config: PathBuf,
 
+    /// Path to base directory for Pico CSS. Will take precedence over configuration file value
+    #[clap(short, long, value_parser)]
+    pub pico_css_base_path: Option<String>,
+
     /// Set how verbose logging level should be
     #[clap(short, long, value_enum)]
     pub verbosity: Option<LevelFilter>,

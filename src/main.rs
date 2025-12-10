@@ -86,7 +86,8 @@ async fn run(args: CliArgs) -> Result<(), Error> {
         .await?;
 
     // Set CSS Path
-    let css_path = get_css_path(config.webui.pico_css_base_path, config.webui.pico_css_color);
+    let css_base_path = args.pico_css_base_path.unwrap_or(config.webui.pico_css_base_path);
+    let css_path = get_css_path(css_base_path, config.webui.pico_css_color);
 
     // Initialize state & listener for Axum
     let state = AppState::new(db, css_path);
