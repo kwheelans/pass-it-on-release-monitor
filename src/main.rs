@@ -29,8 +29,8 @@ use tracing_subscriber::util::SubscriberInitExt;
 use crate::download::download_css_archive;
 
 const SQLITE_MEMORY: &str = "sqlite::memory:";
-const PICO_CSS_URL: &str ="https://github.com/picocss/pico/archive/refs/tags/v2.1.1.tar.gz";
-const PICO_CSS_FILENAME: &str = "picocss.tar.gz";
+const PICO_CSS_URL: &str ="https://github.com/picocss/pico/archive/refs/tags/v2.1.1.zip";
+const PICO_CSS_PATH: &str = "css";
 
 #[tokio::main]
 async fn main() -> ExitCode {
@@ -57,7 +57,7 @@ async fn main() -> ExitCode {
     info!("Verbosity set to {}", verbosity);
 
     let exit = if args.download_pico_css {
-        download_css_archive(PICO_CSS_URL ,PICO_CSS_FILENAME).await
+        download_css_archive(PICO_CSS_URL, PICO_CSS_PATH).await
     } else {
         run(args).await
     };
@@ -128,5 +128,3 @@ async fn run(args: CliArgs) -> Result<(), Error> {
     start_client(config.client.try_into()?, interface_rx, None, None).await?;
     Ok(())
 }
-
-

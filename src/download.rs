@@ -1,14 +1,14 @@
-use std::{fs, io};
+use crate::error::Error;
 use std::ffi::OsStr;
 use std::io::Cursor;
 use std::path::PathBuf;
-use crate::error::Error;
+use std::{fs, io};
 
 pub async fn download_css_archive(url: &str, css_path: &str) -> Result<(), Error> {
-    let extract_path = PathBuf::from("css");
+    let extract_path = PathBuf::from(css_path);
     let response = reqwest::get(url).await?.error_for_status()?;
     let content = Cursor::new(response.bytes().await?);
-    let mut archive = zip::ZipArchive::new(content).expect("unable to get archive");
+    let mut archive = zip::ZipArchive::new(content)?;
     let mut selected: Vec<_> = Vec::new();
 
     for n in archive.file_names() {
@@ -37,9 +37,11 @@ pub async fn download_css_archive(url: &str, css_path: &str) -> Result<(), Error
     for path in selected {
         let filename = path.file_name().unwrap().to_str().unwrap();
         let out_path = extract_path.join(filename);
-        let index = archive.index_for_path(path).expect("unable to get index");
-        let mut data = archive.by_index(index).expect("can't get file");
-        let mut out_file = fs::File::create(out_path).expect("");
+        let index = archive
+            .index_for_path(path)
+            .expect("unable to get index for path");
+        let mut data = archive.by_index(index)?;
+        let mut out_file = fs::File::create(out_path)?;
         io::copy(&mut data, &mut out_file)?;
     }
 
