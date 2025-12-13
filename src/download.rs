@@ -3,9 +3,10 @@ use std::ffi::OsStr;
 use std::io::Cursor;
 use std::path::PathBuf;
 use std::{fs, io};
+use tracing::{debug, info};
 
 pub async fn download_css_archive(url: &str, css_path: &str) -> Result<(), Error> {
-    let extract_path = PathBuf::from(css_path);
+    info!("Downloading Pico CSS from {}", url);
     let response = reqwest::get(url).await?.error_for_status()?;
     let content = Cursor::new(response.bytes().await?);
     let mut archive = zip::ZipArchive::new(content)?;
@@ -20,21 +21,29 @@ pub async fn download_css_archive(url: &str, css_path: &str) -> Result<(), Error
             .to_str()
             .unwrap_or_default();
 
-        if extension.eq(OsStr::new("css"))
-            && file_stem.starts_with("pico.classless")
-            && !file_stem.contains("conditional")
-            && file_stem.contains("min")
+        if file_stem.eq("LICENSE")
+            || (extension.eq(OsStr::new("css"))
+                && file_stem.starts_with("pico.classless")
+                && !file_stem.contains("conditional")
+                && file_stem.contains("min"))
         {
-            println!("{}", path.to_string_lossy());
             selected.push(path);
         }
     }
 
+    let extract_path = PathBuf::from(css_path);
     if !extract_path.is_dir() {
-        fs::create_dir(extract_path.as_path()).expect("could not create directory")
+        info!("Creating directory {}", extract_path.display());
+        fs::create_dir(extract_path.as_path())?;
     }
 
+    info!(
+        "Extracting {} selected files to {}",
+        selected.len(),
+        extract_path.display()
+    );
     for path in selected {
+        debug!("Extracting: {}", path.display());
         let filename = path.file_name().unwrap().to_str().unwrap();
         let out_path = extract_path.join(filename);
         let index = archive

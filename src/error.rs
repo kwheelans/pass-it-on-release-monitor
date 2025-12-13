@@ -45,5 +45,5 @@ pub enum Error {
     Database(#[from] sea_orm::error::DbErr),
 
     #[error("Zip Archive Error: {0}")]
-    ZipArchive(#[from] zip::result::ZipError)
+    ZipArchive(#[from] zip::result::ZipError),
 }

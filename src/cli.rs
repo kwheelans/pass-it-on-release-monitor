@@ -19,5 +19,5 @@ pub struct CliArgs {
 
     /// Download Pico CSS archive and exit
     #[clap(long, conflicts_with = "config")]
-    pub download_pico_css: bool
+    pub download_pico_css: bool,
 }

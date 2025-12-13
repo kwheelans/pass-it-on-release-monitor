@@ -41,7 +41,7 @@ impl PicoCssColour {
 pub struct ReleaseMonitorConfiguration {
     #[serde(default)]
     pub global: GlobalConfiguration,
-    pub monitors: MonitorConfiguration,
+    pub monitors: Option<MonitorConfiguration>,
     pub client: ClientConfigFile,
     pub webui: WebUiConfiguration,
 }
@@ -101,8 +101,4 @@ impl Default for WebUiConfiguration {
             pico_css_color: PicoCssColour::Indigo,
         }
     }
-}
-
-pub fn get_css_path(path: String, colour: PicoCssColour) -> String {
-    format!("{}{}", path, colour.get_pico_css_name())
 }

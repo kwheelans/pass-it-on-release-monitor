@@ -1,21 +1,23 @@
 mod cli;
 mod configuration;
 mod database;
+mod download;
 mod error;
 mod monitors;
 mod ui;
-mod download;
 
 use crate::cli::CliArgs;
-use crate::configuration::{ReleaseMonitorConfiguration, get_css_path};
+use crate::configuration::ReleaseMonitorConfiguration;
 use crate::database::MonitorEntity;
 use crate::database::queries::add_static_monitor;
+use crate::download::download_css_archive;
 use crate::error::Error;
 use crate::monitors::start_monitoring;
 use crate::ui::handlers::{AppState, serve_web_ui};
 use clap::Parser;
 use pass_it_on::start_client;
 use sea_orm::Database;
+use std::path::PathBuf;
 use std::process::ExitCode;
 use std::str::FromStr;
 use tokio::sync::mpsc;
@@ -26,10 +28,9 @@ use tracing_subscriber::filter::Targets;
 use tracing_subscriber::fmt;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
-use crate::download::download_css_archive;
 
 const SQLITE_MEMORY: &str = "sqlite::memory:";
-const PICO_CSS_URL: &str ="https://github.com/picocss/pico/archive/refs/tags/v2.1.1.zip";
+const PICO_CSS_URL: &str = "https://github.com/picocss/pico/archive/refs/tags/v2.1.1.zip";
 const PICO_CSS_PATH: &str = "css";
 
 #[tokio::main]
@@ -68,8 +69,6 @@ async fn main() -> ExitCode {
         }
         Ok(_) => ExitCode::SUCCESS,
     }
-
-
 }
 
 async fn run(args: CliArgs) -> Result<(), Error> {
@@ -97,8 +96,25 @@ async fn run(args: CliArgs) -> Result<(), Error> {
         .await?;
 
     // Set CSS Path
-    let css_base_path = args.pico_css_base_path.unwrap_or(config.webui.pico_css_base_path);
-    let css_path = get_css_path(css_base_path, config.webui.pico_css_color);
+    let css_path = match args.pico_css_base_path {
+        None => {
+            format!(
+                "{}{}",
+                config.webui.pico_css_base_path,
+                config.webui.pico_css_color.get_pico_css_name()
+            )
+        }
+        Some(p) => PathBuf::from(p)
+            .join(config.webui.pico_css_color.get_pico_css_name())
+            .to_string_lossy()
+            .to_string(),
+    };
+    debug!("Using CSS path: {}", css_path);
+    debug!("Current dir: {}", std::env::current_dir()?.display());
+    let entries = std::fs::read_dir(".")?
+        .map(|res| res.map(|e| e.path()))
+        .collect::<Result<Vec<_>, std::io::Error>>()?;
+    debug!("Current dir files: {:?}", entries);
 
     // Initialize state & listener for Axum
     let state = AppState::new(db, css_path);
@@ -111,8 +127,10 @@ async fn run(args: CliArgs) -> Result<(), Error> {
     info!("Listening on: {}", listener.local_addr()?);
 
     // Insert initial monitors from configuration if they do not exist
-    for monitor in &config.monitors.monitor {
-        add_static_monitor(&db, monitor.clone()).await?
+    if let Some(monitors) = &config.monitors {
+        for m in &monitors.monitor {
+            add_static_monitor(&db, m.clone()).await?
+        }
     }
 
     // Setup message channel

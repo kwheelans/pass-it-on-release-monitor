@@ -28,6 +28,7 @@ VERBOSITY=Info
 
 RUN apt-get update && apt-get install -y ca-certificates && rm -rf /var/lib/apt/lists/*
 COPY --from=builder /pass-it-on-release-monitor/target/release/pass-it-on-release-monitor /pass-it-on-release-monitor
+COPY --from=builder /pass-it-on-release-monitor/css /pass-it-on-release-monitor/css
 VOLUME /config
 VOLUME /data
 
