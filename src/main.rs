@@ -4,6 +4,7 @@ mod database;
 mod error;
 mod monitors;
 mod ui;
+mod download;
 
 use crate::cli::CliArgs;
 use crate::configuration::{ReleaseMonitorConfiguration, get_css_path};
@@ -25,8 +26,11 @@ use tracing_subscriber::filter::Targets;
 use tracing_subscriber::fmt;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
+use crate::download::download_css_archive;
 
 const SQLITE_MEMORY: &str = "sqlite::memory:";
+const PICO_CSS_URL: &str ="https://github.com/picocss/pico/archive/refs/tags/v2.1.1.tar.gz";
+const PICO_CSS_FILENAME: &str = "picocss.tar.gz";
 
 #[tokio::main]
 async fn main() -> ExitCode {
@@ -52,13 +56,20 @@ async fn main() -> ExitCode {
         .init();
     info!("Verbosity set to {}", verbosity);
 
-    match run(args).await {
+    let exit = if args.download_pico_css {
+        download_css_archive(PICO_CSS_URL ,PICO_CSS_FILENAME).await
+    } else {
+        run(args).await
+    };
+    match exit {
         Err(error) => {
             error!("{}", error);
             ExitCode::FAILURE
         }
         Ok(_) => ExitCode::SUCCESS,
     }
+
+
 }
 
 async fn run(args: CliArgs) -> Result<(), Error> {
@@ -117,3 +128,5 @@ async fn run(args: CliArgs) -> Result<(), Error> {
     start_client(config.client.try_into()?, interface_rx, None, None).await?;
     Ok(())
 }
+
+
