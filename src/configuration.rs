@@ -1,6 +1,7 @@
 use crate::monitors::Monitor;
 use pass_it_on::ClientConfigFile;
 use serde::{Deserialize, Serialize};
+use std::path::PathBuf;
 use strum::{AsRefStr, EnumString};
 
 const DEFAULT_DATA_PATH: &str = "release-monitor.sqlite";
@@ -88,7 +89,8 @@ impl TryFrom<&str> for ReleaseMonitorConfiguration {
 pub struct WebUiConfiguration {
     pub port: u16,
     pub listen_address: String,
-    pub pico_css_base_path: String,
+    pub pico_css_use_cdn: bool,
+    pub pico_css_local_path: PathBuf,
     pub pico_css_color: PicoCssColour,
 }
 
@@ -97,8 +99,34 @@ impl Default for WebUiConfiguration {
         Self {
             port: 8080,
             listen_address: "0.0.0.0".to_string(),
-            pico_css_base_path: PICO_CSS_CDN_BASE.into(),
+            pico_css_use_cdn: true,
+            pico_css_local_path: "css/".into(),
             pico_css_color: PicoCssColour::Indigo,
+        }
+    }
+}
+
+impl WebUiConfiguration {
+    pub fn get_stylesheet_href(&self) -> String {
+        match self.pico_css_use_cdn {
+            true => {
+                format!(
+                    "{}{}",
+                    PICO_CSS_CDN_BASE,
+                    self.pico_css_color.get_pico_css_name()
+                )
+            }
+            false => PathBuf::from("/css/")
+                .join(self.pico_css_color.get_pico_css_name())
+                .to_string_lossy()
+                .to_string(),
+        }
+    }
+
+    pub fn get_local_css_path(&self) -> Option<PathBuf> {
+        match self.pico_css_use_cdn {
+            true => None,
+            false => Some(self.pico_css_local_path.to_path_buf()),
         }
     }
 }

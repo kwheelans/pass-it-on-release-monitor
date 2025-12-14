@@ -6,7 +6,9 @@ use axum::routing::get;
 use axum::{Router, serve};
 use sea_orm::DatabaseConnection;
 use std::collections::HashMap;
+use std::path::PathBuf;
 use tokio::net::TcpListener;
+use tower_http::services::ServeDir;
 
 pub mod add;
 pub mod edit;
@@ -18,25 +20,43 @@ const ADD_RECORD_TITLE: &str = "Add Monitor Record";
 #[derive(Debug, Clone)]
 pub struct AppState {
     db: DatabaseConnection,
-    css_path: String,
+    stylesheet_href: String,
+    local_css_path: Option<PathBuf>,
 }
 
 impl AppState {
-    pub fn new(db: DatabaseConnection, css_path: String) -> Self {
-        Self { db, css_path }
+    pub fn new(
+        db: DatabaseConnection,
+        stylesheet_href: String,
+        local_css_path: Option<PathBuf>,
+    ) -> Self {
+        Self {
+            db,
+            stylesheet_href,
+            local_css_path,
+        }
     }
     pub fn db(&self) -> &DatabaseConnection {
         &self.db
     }
 
-    pub fn css_path(&self) -> &str {
-        &self.css_path
+    pub fn stylesheet_href(&self) -> &str {
+        &self.stylesheet_href
+    }
+
+    pub fn local_css_path(&self) -> &Option<PathBuf> {
+        &self.local_css_path
     }
 }
 
 pub async fn serve_web_ui(state: AppState, listener: TcpListener) {
-    let routes = Router::new()
-        .route("/", get(get_index))
+    let root_route = match state.local_css_path() {
+        None => Router::new().route("/", get(get_index)),
+        Some(p) => Router::new()
+            .route("/", get(get_index))
+            .nest_service("/css", ServeDir::new(p)),
+    };
+    let other_routes = Router::new()
         .route("/{id}", get(get_index).post(delete_monitor_record))
         .route(
             "/add/{monitor_type}",
@@ -45,7 +65,10 @@ pub async fn serve_web_ui(state: AppState, listener: TcpListener) {
         .route(
             "/edit/{id}",
             get(get_edit_monitor).post(post_edit_monitor_record),
-        )
+        );
+    let routes = Router::new()
+        .merge(root_route)
+        .merge(other_routes)
         .with_state(state);
 
     serve(listener, routes).await.expect("axum serve error")

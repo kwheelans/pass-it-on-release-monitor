@@ -17,7 +17,6 @@ use crate::ui::handlers::{AppState, serve_web_ui};
 use clap::Parser;
 use pass_it_on::start_client;
 use sea_orm::Database;
-use std::path::PathBuf;
 use std::process::ExitCode;
 use std::str::FromStr;
 use tokio::sync::mpsc;
@@ -96,20 +95,11 @@ async fn run(args: CliArgs) -> Result<(), Error> {
         .await?;
 
     // Set CSS Path
-    let css_path = match args.pico_css_base_path {
-        None => {
-            format!(
-                "{}{}",
-                config.webui.pico_css_base_path,
-                config.webui.pico_css_color.get_pico_css_name()
-            )
-        }
-        Some(p) => PathBuf::from(p)
-            .join(config.webui.pico_css_color.get_pico_css_name())
-            .to_string_lossy()
-            .to_string(),
-    };
-    debug!("Using CSS path: {}", css_path);
+    let stylesheet_href = config.webui.get_stylesheet_href();
+    let local_css_path = config.webui.get_local_css_path();
+    debug!("stylesheet_href: {}", stylesheet_href);
+    debug!("local_css_path: {:?}", local_css_path);
+
     debug!("Current dir: {}", std::env::current_dir()?.display());
     let entries = std::fs::read_dir(".")?
         .map(|res| res.map(|e| e.path()))
@@ -117,7 +107,7 @@ async fn run(args: CliArgs) -> Result<(), Error> {
     debug!("Current dir files: {:?}", entries);
 
     // Initialize state & listener for Axum
-    let state = AppState::new(db, css_path);
+    let state = AppState::new(db, stylesheet_href, local_css_path);
     let listener = tokio::net::TcpListener::bind(format!(
         "{}:{}",
         config.webui.listen_address, config.webui.port

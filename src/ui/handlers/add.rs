@@ -29,12 +29,12 @@ pub async fn get_add_monitor(
     match monitor_type.as_str() {
         TYPE_NAME_GITHUB => Ok(add_github_monitor_page(
             format!("{} - {}", ADD_RECORD_TITLE, "Github").as_str(),
-            state.css_path(),
+            state.stylesheet_href(),
         )
         .await),
         TYPE_NAME_RANCHER_CHANNEL => Ok(add_rancher_channel_page(
             format!("{} - {}", ADD_RECORD_TITLE, "Rancher-Channel").as_str(),
-            state.css_path(),
+            state.stylesheet_href(),
         )
         .await),
         _ => Err(StatusCode::NOT_FOUND),

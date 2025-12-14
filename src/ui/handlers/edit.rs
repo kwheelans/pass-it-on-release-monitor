@@ -52,7 +52,7 @@ async fn edit_github_monitor(
                 name: model.name.clone(),
                 inner,
             };
-            Ok(edit_github_monitor_page(ADD_RECORD_TITLE, state.css_path(), monitor).await)
+            Ok(edit_github_monitor_page(ADD_RECORD_TITLE, state.stylesheet_href(), monitor).await)
         }
         Err(e) => {
             error!("Unable to parse JSON: {}", e);
@@ -73,10 +73,12 @@ async fn edit_rancher_channel_monitor(
                 name: model.name.clone(),
                 inner,
             };
-            Ok(
-                edit_rancher_channel_monitor_page(ADD_RECORD_TITLE, state.css_path(), monitor)
-                    .await,
+            Ok(edit_rancher_channel_monitor_page(
+                ADD_RECORD_TITLE,
+                state.stylesheet_href(),
+                monitor,
             )
+            .await)
         }
         Err(e) => {
             error!("Unbale to parse JSON: {}", e);
