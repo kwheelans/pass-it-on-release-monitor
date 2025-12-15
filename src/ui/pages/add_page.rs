@@ -3,9 +3,9 @@ use crate::monitors::rancher_channel_server::TYPE_NAME_RANCHER_CHANNEL;
 use crate::ui::pages::{base, title};
 use maud::{Markup, html};
 
-pub async fn add_github_monitor_page(page_title: &str) -> Markup {
+pub async fn add_github_monitor_page(page_title: &str, css_path: &str) -> Markup {
     html! {
-        (base().await)
+        (base(css_path).await)
         body {
             (title(page_title).await)
             main {
@@ -36,9 +36,9 @@ pub async fn add_github_monitor_page(page_title: &str) -> Markup {
     }
 }
 
-pub async fn add_rancher_channel_page(page_title: &str) -> Markup {
+pub async fn add_rancher_channel_page(page_title: &str, css_path: &str) -> Markup {
     html! {
-        (base().await)
+        (base(css_path).await)
         body {
             (title(page_title).await)
             main {

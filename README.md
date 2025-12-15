@@ -17,6 +17,14 @@ A pass-it-on client to send notifications when a configured monitor detects a ne
 [global]
 persist = true
 db_path = "/path/to/db/release-monitor.sqlite"
+github_personal_token = "sometoken"
+
+[webui]
+port = 8080
+listen_address = "0.0.0.0"
+pico_css_use_cdn = true
+pico_css_local_path = "css/"
+pico_css_color = "Indigo"
 
 [client]
 key = "change me"

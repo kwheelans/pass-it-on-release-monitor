@@ -6,9 +6,13 @@ use crate::monitors::{FrequencyPeriod, FrequencyValue};
 use crate::ui::pages::{base, title};
 use maud::{Markup, html};
 
-pub async fn edit_github_monitor_page(page_title: &str, monitor: GithubConfiguration) -> Markup {
+pub async fn edit_github_monitor_page(
+    page_title: &str,
+    css_path: &str,
+    monitor: GithubConfiguration,
+) -> Markup {
     html! {
-        (base().await)
+        (base(css_path).await)
         body {
             (title(page_title).await)
             main {
@@ -35,10 +39,11 @@ pub async fn edit_github_monitor_page(page_title: &str, monitor: GithubConfigura
 
 pub async fn edit_rancher_channel_monitor_page(
     page_title: &str,
+    css_path: &str,
     monitor: RancherChannelServerConfiguration,
 ) -> Markup {
     html! {
-        (base().await)
+        (base(css_path).await)
         body {
             (title(page_title).await)
             main {

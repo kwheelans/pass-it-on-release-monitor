@@ -15,6 +15,7 @@ RUN cargo chef cook --release --recipe-path recipe.json
 # Build application
 COPY . .
 RUN cargo build --release --frozen --bin pass-it-on-release-monitor
+RUN ./target/release/pass-it-on-release-monitor --download-pico-css
 
 # Final image
 FROM debian:13-slim
@@ -27,6 +28,7 @@ VERBOSITY=Info
 
 RUN apt-get update && apt-get install -y ca-certificates && rm -rf /var/lib/apt/lists/*
 COPY --from=builder /pass-it-on-release-monitor/target/release/pass-it-on-release-monitor /pass-it-on-release-monitor
+COPY --from=builder /pass-it-on-release-monitor/css /pass-it-on-release-monitor/css
 VOLUME /config
 VOLUME /data
 

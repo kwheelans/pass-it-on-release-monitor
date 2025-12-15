@@ -4,7 +4,7 @@ pub(super) mod index_page;
 
 use maud::{DOCTYPE, Markup, html};
 
-pub async fn base() -> Markup {
+pub async fn base(css_path: &str) -> Markup {
     html! {
         (DOCTYPE)
         html {
@@ -12,7 +12,7 @@ pub async fn base() -> Markup {
                 meta charset="utf-8";
                 meta name="viewport" content="width=device-width, initial-scale=1";
                 meta name="color-scheme" content="light dark";
-                link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.classless.indigo.min.css";
+                link rel="stylesheet" href=(css_path);
             }
         }
     }

@@ -2,15 +2,18 @@ use crate::database::MonitorModel;
 use crate::monitors::github_release::TYPE_NAME_GITHUB;
 use crate::monitors::rancher_channel_server::TYPE_NAME_RANCHER_CHANNEL;
 use crate::ui::pages::{base, title};
+use chrono::{Local, SecondsFormat};
 use maud::{Markup, html};
-use sea_orm::prelude::ChronoUtc;
-use tracing::log::debug;
+use tracing::trace;
 
-const DATE_FORMAT: &str = "%Y-%m-%d %H:%M:%S %Z";
-
-pub async fn index_page(page_title: &str, records: Vec<MonitorModel>, id: Option<i64>) -> Markup {
+pub async fn index_page(
+    page_title: &str,
+    css_path: &str,
+    records: Vec<MonitorModel>,
+    id: Option<i64>,
+) -> Markup {
     html! {
-        (base().await)
+        (base(css_path).await)
         body {
             (title(page_title).await)
             main {
@@ -21,10 +24,9 @@ pub async fn index_page(page_title: &str, records: Vec<MonitorModel>, id: Option
 }
 
 async fn list_records(records: Vec<MonitorModel>, id: Option<i64>) -> Markup {
-    let now = ChronoUtc::now().format(DATE_FORMAT);
+    let now = chrono::Utc::now();
     let has_records = !records.is_empty();
-    debug!("Index: {:?}", id);
-    debug!("Has_records: {}", has_records);
+    trace!("Index: {:?}", id);
 
     html! {
         section {
@@ -44,7 +46,7 @@ async fn list_records(records: Vec<MonitorModel>, id: Option<i64>) -> Markup {
                     }
                 }
             }
-            { "Current Time: " (now)}
+            { "Current Time: " (now.with_timezone(&Local).to_rfc3339_opts(SecondsFormat::Secs, false))}
             h2 { "Database Records" }
             @if has_records {
                 table {
@@ -62,7 +64,7 @@ async fn list_records(records: Vec<MonitorModel>, id: Option<i64>) -> Markup {
                                 td { (record.name) }
                                 td { (record.monitor_type) }
                                 td { (record.version) }
-                                td { (record.timestamp.0) }
+                                td { (record.timestamp.0.with_timezone(&Local).to_rfc3339()) }
                             }
                         }
                     }

@@ -1,6 +1,7 @@
 mod cli;
 mod configuration;
 mod database;
+mod download;
 mod error;
 mod monitors;
 mod ui;
@@ -9,6 +10,7 @@ use crate::cli::CliArgs;
 use crate::configuration::ReleaseMonitorConfiguration;
 use crate::database::MonitorEntity;
 use crate::database::queries::add_static_monitor;
+use crate::download::download_css_archive;
 use crate::error::Error;
 use crate::monitors::start_monitoring;
 use crate::ui::handlers::{AppState, serve_web_ui};
@@ -27,6 +29,8 @@ use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 
 const SQLITE_MEMORY: &str = "sqlite::memory:";
+const PICO_CSS_URL: &str = "https://github.com/picocss/pico/archive/refs/tags/v2.1.1.zip";
+const PICO_CSS_PATH: &str = "css";
 
 #[tokio::main]
 async fn main() -> ExitCode {
@@ -35,10 +39,16 @@ async fn main() -> ExitCode {
         LevelFilter::from_str(std::env::var("VERBOSITY").unwrap_or_default().as_str())
             .unwrap_or(LevelFilter::INFO),
     );
+    let sqlx_log_level = match verbosity {
+        LevelFilter::TRACE => LevelFilter::TRACE,
+        LevelFilter::DEBUG => LevelFilter::DEBUG,
+        _ => LevelFilter::WARN,
+    };
 
     // Configure logging
     let log_filter = Targets::default()
         .with_target("pass_it_on_release_monitor", verbosity)
+        .with_target("sqlx", sqlx_log_level)
         .with_default(LevelFilter::INFO);
     tracing_subscriber::registry()
         .with(fmt::layer())
@@ -46,7 +56,12 @@ async fn main() -> ExitCode {
         .init();
     info!("Verbosity set to {}", verbosity);
 
-    match run(args).await {
+    let exit = if args.download_pico_css {
+        download_css_archive(PICO_CSS_URL, PICO_CSS_PATH).await
+    } else {
+        run(args).await
+    };
+    match exit {
         Err(error) => {
             error!("{}", error);
             ExitCode::FAILURE
@@ -79,19 +94,33 @@ async fn run(args: CliArgs) -> Result<(), Error> {
         .sync(&db)
         .await?;
 
+    // Set CSS Path
+    let stylesheet_href = config.webui.get_stylesheet_href();
+    let local_css_path = config.webui.get_local_css_path();
+    debug!("stylesheet_href: {}", stylesheet_href);
+    debug!("local_css_path: {:?}", local_css_path);
+
+    debug!("Current dir: {}", std::env::current_dir()?.display());
+    let entries = std::fs::read_dir(".")?
+        .map(|res| res.map(|e| e.path()))
+        .collect::<Result<Vec<_>, std::io::Error>>()?;
+    debug!("Current dir files: {:?}", entries);
+
     // Initialize state & listener for Axum
-    let state = AppState::new(db);
+    let state = AppState::new(db, stylesheet_href, local_css_path);
     let listener = tokio::net::TcpListener::bind(format!(
         "{}:{}",
-        config.global.web_ui_address, config.global.web_ui_port
+        config.webui.listen_address, config.webui.port
     ))
     .await?;
     let db = state.db().clone();
     info!("Listening on: {}", listener.local_addr()?);
 
     // Insert initial monitors from configuration if they do not exist
-    for monitor in &config.monitors.monitor {
-        add_static_monitor(&db, monitor.clone()).await?
+    if let Some(monitors) = &config.monitors {
+        for m in &monitors.monitor {
+            add_static_monitor(&db, m.clone()).await?
+        }
     }
 
     // Setup message channel

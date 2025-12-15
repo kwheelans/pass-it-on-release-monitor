@@ -19,9 +19,15 @@ pub async fn get_index(
         }
     }?;
     if let Some(Path(selected)) = id {
-        Ok(index_page(INDEX_PAGE_TITLE, records, Some(selected)).await)
+        Ok(index_page(
+            INDEX_PAGE_TITLE,
+            state.stylesheet_href(),
+            records,
+            Some(selected),
+        )
+        .await)
     } else {
-        Ok(index_page(INDEX_PAGE_TITLE, records, None).await)
+        Ok(index_page(INDEX_PAGE_TITLE, state.stylesheet_href(), records, None).await)
     }
 }
 
