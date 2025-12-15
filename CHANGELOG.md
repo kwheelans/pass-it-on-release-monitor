@@ -1,4 +1,9 @@
 # Unreleased
+# v0.5.0
+## Features
+- Add Pico CSS path and colour selection
+- Display time as local time
+
 
 # v0.4.0
 ## Features
