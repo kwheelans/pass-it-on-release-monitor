@@ -2,11 +2,9 @@ use crate::database::MonitorModel;
 use crate::monitors::github_release::TYPE_NAME_GITHUB;
 use crate::monitors::rancher_channel_server::TYPE_NAME_RANCHER_CHANNEL;
 use crate::ui::pages::{base, title};
+use chrono::{Local, SecondsFormat};
 use maud::{Markup, html};
-use sea_orm::prelude::ChronoUtc;
 use tracing::trace;
-
-const DATE_FORMAT: &str = "%Y-%m-%d %H:%M:%S %Z";
 
 pub async fn index_page(
     page_title: &str,
@@ -26,10 +24,9 @@ pub async fn index_page(
 }
 
 async fn list_records(records: Vec<MonitorModel>, id: Option<i64>) -> Markup {
-    let now = ChronoUtc::now().format(DATE_FORMAT);
+    let now = chrono::Utc::now();
     let has_records = !records.is_empty();
     trace!("Index: {:?}", id);
-    trace!("Has_records: {}", has_records);
 
     html! {
         section {
@@ -49,7 +46,7 @@ async fn list_records(records: Vec<MonitorModel>, id: Option<i64>) -> Markup {
                     }
                 }
             }
-            { "Current Time: " (now)}
+            { "Current Time: " (now.with_timezone(&Local).to_rfc3339_opts(SecondsFormat::Secs, false))}
             h2 { "Database Records" }
             @if has_records {
                 table {
@@ -67,7 +64,7 @@ async fn list_records(records: Vec<MonitorModel>, id: Option<i64>) -> Markup {
                                 td { (record.name) }
                                 td { (record.monitor_type) }
                                 td { (record.version) }
-                                td { (record.timestamp.0) }
+                                td { (record.timestamp.0.with_timezone(&Local).to_rfc3339()) }
                             }
                         }
                     }
