@@ -1,8 +1,9 @@
 use crate::database::queries::{delete_monitor, select_all_monitors};
-use crate::ui::handlers::{AppState, INDEX_PAGE_TITLE};
+use crate::ui::handlers::{AppState, INDEX_PAGE_TITLE, UI_ROOT};
 use crate::ui::pages::index_page::index_page;
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
+use axum::response::{IntoResponse, Redirect};
 use maud::Markup;
 use tracing::{debug, error};
 
@@ -34,10 +35,10 @@ pub async fn get_index(
 pub async fn delete_monitor_record(
     state: State<AppState>,
     Path(id): Path<i64>,
-) -> Result<Markup, StatusCode> {
+) -> Result<impl IntoResponse, StatusCode> {
     debug!("Delete monitor record id: {}", id);
     delete_monitor(&state.db, id)
         .await
         .expect("unable to delete record");
-    get_index(state, None).await
+    Ok(Redirect::to(UI_ROOT))
 }

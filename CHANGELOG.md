@@ -1,4 +1,7 @@
 # Unreleased
+## Changes
+- Web UI redirect to main page after posting from add, edit or delete
+
 # v0.5.0
 ## Features
 - Add Pico CSS path and colour selection
