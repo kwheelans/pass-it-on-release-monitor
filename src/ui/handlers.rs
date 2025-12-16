@@ -16,6 +16,7 @@ pub mod index;
 
 const INDEX_PAGE_TITLE: &str = "Release Monitor";
 const ADD_RECORD_TITLE: &str = "Add Monitor Record";
+const UI_ROOT: &str = "/";
 
 #[derive(Debug, Clone)]
 pub struct AppState {
