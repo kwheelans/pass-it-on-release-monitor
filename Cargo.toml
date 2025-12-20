@@ -33,7 +33,7 @@ toml = "0.9.8"
 tracing = "0.1"
 tracing-subscriber = "0.3"
 typetag = "0.2"
-zip = { version = "6", default-features = false, features = ["deflate-flate2","deflate-flate2-zlib-rs"]}
+zip = { version = "7", default-features = false, features = ["deflate-flate2","deflate-flate2-zlib-rs"]}
 
 [profile.release]
 lto = true
