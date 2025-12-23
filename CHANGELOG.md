@@ -1,6 +1,10 @@
 # Unreleased
+
+# v0.5.1
 ## Changes
 - Web UI redirect to main page after posting from add, edit or delete
+- update `octocrab` dependency  to version 0.49
+- - update `zip` dependency  to version 7
 
 # v0.5.0
 ## Features
