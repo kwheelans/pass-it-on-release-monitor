@@ -1,5 +1,14 @@
 # Unreleased
 
+# v0.6.0
+## Breaking CHanges
+- Remove rustls-tls-native-roots feature
+
+## Changes
+- update pass-it-on to 0.17
+- update request to 0.13
+- add rustls crate and specifically select the aws_lc_rs provider
+
 # v0.5.1
 ## Changes
 - Web UI redirect to main page after posting from add, edit or delete

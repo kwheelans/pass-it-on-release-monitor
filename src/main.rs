@@ -44,6 +44,7 @@ async fn main() -> ExitCode {
         LevelFilter::DEBUG => LevelFilter::DEBUG,
         _ => LevelFilter::WARN,
     };
+    rustls::crypto::aws_lc_rs::default_provider().install_default().expect("unable to install rustls crypto provider");
 
     // Configure logging
     let log_filter = Targets::default()
