@@ -15,7 +15,6 @@ RUN cargo chef cook --release --recipe-path recipe.json
 # Build application
 COPY . .
 RUN cargo build --release --frozen --bin pass-it-on-release-monitor
-RUN ./target/release/pass-it-on-release-monitor --download-pico-css
 
 # Download CSS
 FROM ghcr.io/kwheelans/container-utils:0.1 AS css
