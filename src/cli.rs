@@ -16,8 +16,4 @@ pub struct CliArgs {
     /// Set how verbose logging level should be
     #[clap(short, long, value_enum)]
     pub verbosity: Option<LevelFilter>,
-
-    /// Download Pico CSS archive and exit
-    #[clap(long, conflicts_with = "config")]
-    pub download_pico_css: bool,
 }

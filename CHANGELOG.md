@@ -1,8 +1,9 @@
 # Unreleased
 
 # v0.6.0
-## Breaking CHanges
+## Breaking Changes
 - Remove rustls-tls-native-roots feature
+- Remove download-pico-css from the CLI and use the container-utils docker image isntead
 
 ## Changes
 - update pass-it-on to 0.17
