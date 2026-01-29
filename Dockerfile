@@ -17,6 +17,11 @@ COPY . .
 RUN cargo build --release --frozen --bin pass-it-on-release-monitor
 RUN ./target/release/pass-it-on-release-monitor --download-pico-css
 
+# Download CSS
+FROM ghcr.io/kwheelans/container-utils:0.1 AS css
+WORKDIR /app
+RUN container-utils pico-css-download
+
 # Final image
 FROM debian:13-slim
 
@@ -28,7 +33,7 @@ VERBOSITY=Info
 
 RUN apt-get update && apt-get install -y ca-certificates && rm -rf /var/lib/apt/lists/*
 COPY --from=builder /pass-it-on-release-monitor/target/release/pass-it-on-release-monitor /pass-it-on-release-monitor
-COPY --from=builder /pass-it-on-release-monitor/css /pass-it-on-release-monitor/css
+COPY --from=css /app/css /pass-it-on-release-monitor/css
 VOLUME /config
 VOLUME /data
 
