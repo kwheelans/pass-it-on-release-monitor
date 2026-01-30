@@ -9,10 +9,9 @@
         "cargo"
       ],
       "matchUpdateTypes": [
-        "patch",
-        "lockFileMaintenance"
+        "patch"
       ],
-      "groupName": "Patch Dependencies",
+      "groupName": "Rust Patch Dependencies",
       "enabled": true
     }
   ]
