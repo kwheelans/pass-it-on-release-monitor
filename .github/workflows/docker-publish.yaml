@@ -9,6 +9,9 @@ on:
       - '.github/**'
       - 'tests/**'
       - 'README.md'
+      - 'CHANGELOG.md'
+      - 'renovate.json'
+      - '.gitignore'
 
 
 concurrency:

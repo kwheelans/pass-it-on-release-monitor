@@ -4,6 +4,14 @@ on:
   workflow_dispatch:
   push:
     branches: [ 'main' ]
+    paths-ignore:
+      - 'Dockerfile'
+      - 'README.md'
+      - 'CHANGELOG.md'
+      - 'LICENSE'
+      - 'renovate.json'
+      - '.gitignore'
+      - '.dockerignore'
 
 
 concurrency:
