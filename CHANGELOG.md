@@ -1,5 +1,9 @@
 # Unreleased
 
+# v0.6.1
+## Changes
+- remove unnecessary feature for sea-orm
+
 # v0.6.0
 ## Breaking Changes
 - Remove rustls-tls-native-roots feature
