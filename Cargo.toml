@@ -1,6 +1,6 @@
 [package]
 name = "pass-it-on-release-monitor"
-version = "0.6.2"
+version = "0.6.3"
 authors = ["Kevin Wheelans <kevin.wheelans@proton.me>"]
 edition = "2024"
 description = "A pass-it-on client to send notifications when a configured monitor detects a new version has been released"
@@ -15,7 +15,7 @@ axum = { version = "0.8" }
 clap = {version = "4", features = ["derive"]}
 chrono = { version = "0.4"}
 maud = { version = "0.27", features = ["axum"]}
-octocrab = "0.50"
+octocrab = "0.51"
 pass-it-on = { version = "0.17", features = ["client", "http-client", "parse-cfg"], default-features = false}
 reqwest = { version = "0.13",  features = ["json"], default-features = true }
 rustls = { version = "0.23"}

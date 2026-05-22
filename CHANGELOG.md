@@ -1,4 +1,9 @@
 # Unreleased
+
+# v0.6.2
+## Changes
+- update `octocrab` to 0.51
+
 # v0.6.2
 ## Changes
 - update `octocrab` to 0.50
