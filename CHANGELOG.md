@@ -1,4 +1,7 @@
 # Unreleased
+## Changes
+- update `octocrab` to 0.54
+- update  `tower-http`to 0.7
 
 # v0.6.2
 ## Changes
