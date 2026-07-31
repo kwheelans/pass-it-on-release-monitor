@@ -17,7 +17,7 @@
         "patch"
       ],
       "groupName": "Rust Patch Dependencies",
-      "enabled": true
+      "enabled": false
     }
   ]
 }
