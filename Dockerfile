@@ -17,7 +17,7 @@ COPY . .
 RUN cargo build --release --frozen --bin pass-it-on-release-monitor
 
 # Download CSS
-FROM ghcr.io/kwheelans/container-utils:0.1 AS css
+FROM ghcr.io/kwheelans/container-utils:0.2 AS css
 WORKDIR /app
 RUN container-utils pico-css-download
 
