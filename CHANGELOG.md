@@ -1,4 +1,10 @@
 # Unreleased
+
+# v0.6.4
+## Changes
+- update `zip` to v9
+
+# v0.6.3
 ## Changes
 - update `octocrab` to 0.54
 - update  `tower-http`to 0.7
